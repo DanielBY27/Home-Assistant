@@ -1,0 +1,7 @@
+- binary_sensor:
+  - name: "Energy config - Good Day"
+    unique_id: energy_config_good_day
+    state: >
+      {{
+      states('sensor.energy_config_good_day_calculator') | float(0) >= states('input_number.energy_config_good_day_value') | float(0)
+      }}

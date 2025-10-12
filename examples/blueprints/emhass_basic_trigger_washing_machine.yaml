@@ -1,0 +1,20 @@
+alias: Washing-Machine EMHASS Trigger
+description: ""
+use_blueprint:
+  path: emhass_basic_trigger.yaml
+  input:
+    input_status: input_select.washing_machine_emhass_status
+    input_emhass: input_text.washing_machine_emhass_json
+    input_trigger: sensor.p_deferrable2
+    wait_sensor: sensor.waschmaschine_leistung_2
+    wait_value: 30
+    stop_sensor: sensor.waschmaschinestatistik10
+    stop_value: 1
+    update_sensor: switch.waschmaschine_2
+    nominal_powers: 600
+    operating_hours: "1.5"
+    start_timesteps: 0
+    end_timesteps: 6
+    minimum_power_deferrable_load: 100
+    notify_group: parents_mobile_phones
+    notify_done: Waschmaschine ist fertig!

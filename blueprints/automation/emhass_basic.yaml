@@ -1,0 +1,1384 @@
+blueprint:
+  name: EMHASS Basic Automation Controller
+  description: |
+    This blueprint acts as the central controller for the EMHASS (Energy Management Optimization for Home Assistant) integration.
+    It is the **only** automation that should communicate directly with the EMHASS add-on.
+
+    **Core Functions:**
+    * **Manages Timers:** Controls the scheduled execution of EMHASS actions (Publish, Optimization, ML Forecast, Config Save).
+    * **Central Configuration:** Provides a UI to configure all core EMHASS parameters.
+    * **Dynamic Deferrable Loads:** Collects and aggregates data from one or more `EMHASS Deferrable Load Controller` blueprints.
+    * **REST API Calls:** Executes the `rest_command` calls to the EMHASS API for all actions.
+
+    **Requirements:**
+    * The [EMHASS: Energy Management Optimization for Home Assistant](https://github.com/davidusb-geek/emhass) add-on.
+    * A `rest_command` service defined in your `configuration.yaml` (e.g., `rest_command.emhass_rest_command`).
+    * (Optional) One or more automations based on the `EMHASS Deferrable Load Controller` (emhass_basic_trigger.yaml) blueprint.
+  domain: automation
+  author: DanielBY27
+  homeassistant:
+    min_version: 2025.10.0
+
+# ----------------
+# --- EMHASS Input
+# ----------------
+
+  input:
+
+    # --- EMHASS Input Timer
+    grid_emhass_timer_config:
+      name: Timer Settings
+      description: >
+        Configure the CRON timers that trigger the main EMHASS actions.
+      collapsed: true
+      input:
+        enable_publish_timer:
+          name: Enable Publish & Optimization Timer (5 min interval)
+          description: >
+            Controls whether the publish trigger (and optimization, if needed) runs every 5 minutes.
+          default: false
+          selector:
+            boolean:
+        publish_minutes_timer:
+          name: Publish Timer - CRON Minutes Pattern
+          description: >
+            Minute pattern for the EMHASS publish action (e.g., /5 for every 5 minutes).
+          default: "/5"
+          selector:
+            select:
+              options:
+                - "/5"
+        enable_forecast_timer:
+          name: Enable ML Forecast Timer (daily)
+          description: >
+            Controls whether the daily machine learning forecast training is triggered.
+          default: false
+          selector:
+            boolean:
+        forecast_timer_hours:
+          name: ML Forecast Timer - CRON Hours Pattern
+          description: >
+            Hour pattern for the EMHASS forecast action (e.g., 5 for 5:00 AM).
+          default: "5"
+          selector:
+            text:
+              multiline: false
+        forecast_timer_minutes:
+          name: ML Forecast Timer - CRON Minutes Pattern
+          description: >
+            Minute pattern for the EMHASS forecast action (e.g., 27 for 5:27 AM).
+          default: "27"
+          selector:
+            text:
+              multiline: false
+        enable_save_timer:
+          name: Enable Save-Config Timer (daily)
+          description: >
+            Controls whether the daily save-config trigger is enabled. This persists the settings below to your EMHASS config file.
+          default: false
+          selector:
+            boolean:
+        save_timer_hours:
+          name: Save-Config Timer - CRON Hours Pattern
+          description: >
+            Hour pattern for the EMHASS save action (e.g., 5).
+          default: "5"
+          selector:
+            text:
+              multiline: false
+        save_timer_minutes:
+          name: Save-Config Timer - CRON Minutes Pattern
+          description: >
+            Minute pattern for the EMHASS save action (e.g., 37).
+          default: "37"
+          selector:
+            text:
+              multiline: false
+
+    # --- EMHASS Deferrable Loads Configuration
+    grid_emhass_deferrable_loads_config:
+      name: EMHASS Deferrable Loads Configuration
+      description: >
+        Links the `input_text` helpers managed by your 'EMHASS Deferrable Load Controller' automations.
+      collapsed: true
+      input:
+        list_emhass_deferrable_loads:
+          name: List of Deferrable Load Helpers (Input Text)
+          description: >
+            Add all `input_text` entities that are controlled by your 'EMHASS Deferrable Load Controller' blueprints.
+            This automation reads the JSON data from them to build the optimization payload.
+          default:
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - input_text
+
+    # --- EMHASS Overwrite default Configuration
+    grid_emhass_overwrite_config:
+      name: EMHASS Runtime Overwrites
+      description: >
+        These settings are injected into the EMHASS API calls, primarily for optimization.
+        They allow dynamic updates (e.g., SOC, forecasts) without saving to the main config file.
+      collapsed: true
+      input:
+        emhass_config_get_data_from_home_assistant:
+          name: get_data_from_home_assistant
+          description: >
+            (Runtime) Force EMHASS to fetch fresh data from Home Assistant before acting.
+          default: true
+          selector:
+            boolean:
+        emhass_config_force_update_data:
+          name: force_update_data
+          description: >
+            (Runtime) Force EMHASS to update its internal data tables.
+          default: true
+          selector:
+            boolean:
+        emhass_config_set_forecast_to_hass:
+          name: set_forecast_to_hass
+          description: >
+            (Runtime) Controls if EMHASS writes its forecast results back to Home Assistant sensors.
+          default: true
+          selector:
+            boolean:
+        emhass_config_load_cost_forecast:
+          name: load_cost_forecast (Array or Template)
+          description: >
+            (Runtime) Overwrites the load cost forecast. Expects a template or a JSON array (e.g., [0.3] * 48 for 48 steps).
+          default:
+          selector:
+            text:
+              multiline: true
+        emhass_config_p_pv_forecast:
+          name: p_pv_forecast (Array or Template)
+          description: >
+            (Runtime) Overwrites the PV production forecast. Expects a template or a JSON array (e.g., [0] * 48 for 48 steps).
+          default:
+          selector:
+            text:
+              multiline: true
+        emhass_config_solar_forecast_kwp:
+          name: solar_forecast_kwp (Peak Power)
+          description: >
+            The peak power of your solar installation in kWp, used for Solcast/similar forecast methods.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              mode: box
+        emhass_config_soc_init:
+          name: soc_init (Initial SOC Template)
+          description: >
+            (Runtime) Initial battery state of charge. Provide a template or a value between 0.0 and 1.0 (e.g., 0.43 for 43%).
+          default:
+          selector:
+            text:
+              multiline: true
+        emhass_config_soc_final:
+          name: soc_final (Target SOC Template)
+          description: >
+            (Runtime) Target battery state of charge at the end of the optimization period. Template or value (0.0 - 1.0).
+          default:
+          selector:
+            text:
+              multiline: true
+
+    # --- EMHASS Connection Configuration
+    grid_emhass_connection_config:
+      name: EMHASS Connection Settings (IP, Port and APIs)
+      description: >
+        Defines how Home Assistant connects to the EMHASS add-on API.
+      collapsed: true
+      input:
+        emhass_rest_name:
+          name: REST Service Name
+          description: >
+            The name of the `rest_command` service defined in your configuration.yaml.
+          default: rest_command.emhass_rest_command
+          selector:
+            text:
+              type: text
+        emhass_protocol:
+          name: Protocol
+          description: >
+            The protocol for the EMHASS connection (http or https).
+          default: http
+          selector:
+            select:
+              options:
+                - http
+                - https
+        emhass_host:
+          name: Host
+          description: >
+            Hostname or IP address of the EMHASS Server (e.g., 'localhost' or the add-on IP).
+          default: localhost
+          selector:
+            text:
+              type: text
+        emhass_port:
+          name: Port
+          description: >
+            The port on which EMHASS is running (default is 5000).
+          default: 5000
+          selector:
+            number:
+              min: 1
+              max: 65535
+              mode: box
+        emhass_api_publish:
+          name: EMHASS Publish API
+          description: >
+            The EMHASS Publish API Endpoint.
+          default: action/publish-data
+          selector:
+            text:
+              type: text
+        emhass_api_optim:
+          name: EMHASS Optimization API
+          description: >
+            The EMHASS Optimization API Endpoint (e.g., dayahead-optim).
+          default: action/dayahead-optim
+          selector:
+            text:
+              type: text
+        emhass_api_save:
+          name: EMHASS Save-Config API
+          description: >
+            The EMHASS Save-Config (set-config) API Endpoint.
+          default: set-config
+          selector:
+            text:
+              type: text
+        emhass_api_ml:
+          name: EMHASS Forecast API
+          description: >
+            The EMHASS ML Forecast API Endpoint.
+          default: action/forecast-model-fit
+          selector:
+            text:
+              type: text
+
+    # --- EMHASS Global Configuration
+    grid_emhass_global_config:
+      name: EMHASS Global Configuration
+      description: >
+        High-level settings for optimization cost function and core sensors.
+      collapsed: true
+      input:
+        emhass_config_costfun:
+          name: costfun (Cost Function)
+          description: >
+            The optimization goal (e.g., 'self-consumption', 'cost', 'profit').
+          default: self-consumption
+          selector:
+            select:
+              options:
+                - self-consumption
+                - cost
+                - profit
+        emhass_config_sensor_power_photovoltaics:
+          name: sensor_power_photovoltaics
+          description: >
+            Your main sensor entity for PV production power (in W).
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                domain: sensor
+        emhass_config_sensor_power_load_no_var_loads:
+          name: sensor_power_load_no_var_loads
+          description: >
+            Your main sensor entity for house consumption (in W), *excluding* deferrable loads.
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                domain: sensor
+        emhass_config_continual_publish:
+          name: continual_publish
+          description: >
+            If true, EMHASS will keep publishing data even if optimization fails.
+          default: false
+          selector:
+            boolean:
+        emhass_config_logging_level:
+          name: logging_level
+          description: >
+            The logging level for the EMHASS add-on.
+          default: INFO
+          selector:
+            select:
+              options:
+                - label: DEBUG
+                  value: DEBUG
+                - label: INFO
+                  value: INFO
+                - label: WARNING
+                  value: WARNING
+
+    # --- EMHASS System Configuration
+    grid_emhass_system_config:
+      name: EMHASS System Configuration
+      description: >
+        Core technical parameters for the EMHASS optimization model.
+      collapsed: true
+      input:
+        emhass_config_optimization_time_step:
+          name: optimization_time_step
+          description: >
+            The time step in minutes for optimization (e.g., 30). This MUST match the setting in your 'Deferrable Load' blueprints.
+          default: "30"
+          selector:
+            select:
+              options:
+                - "30"
+        emhass_config_historic_days_to_retrieve:
+          name: historic_days_to_retrieve
+          description: >
+            Number of past days of data to retrieve from Home Assistant.
+          default: 9
+          selector:
+            number:
+              min: 1
+              max: 10
+              step: 1
+              mode: box
+        emhass_config_load_negative:
+          name: load_negative
+          description: >
+            Allow negative load values (e.g., if your load sensor includes PV).
+          default: false
+          selector:
+            boolean:
+        emhass_config_set_zero_min:
+          name: set_zero_min
+          description: >
+            If true, clamps negative values in forecasts to zero.
+          default: true
+          selector:
+            boolean:
+        emhass_config_method_ts_round:
+          name: method_ts_round
+          description: >
+            Method for timestamp rounding. 'nearest' is recommended.
+          default: nearest
+          selector:
+            select:
+              options:
+                - nearest
+        emhass_config_delta_forecast_daily:
+          name: delta_forecast_daily
+          description: >
+            Number of days to forecast (1 = today, 2 = today and tomorrow).
+          default: 1
+          selector:
+            number:
+              min: 1
+              max: 10
+              step: 1
+              mode: box
+        emhass_config_load_forecast_method:
+          name: load_forecast_method
+          description: >
+            Method to use for load forecasting (e.g., 'mlforecaster', 'naive', 'typical').
+          default: naive
+          selector:
+            select:
+              options:
+                - mlforecaster
+                - typical
+                - naive
+        emhass_config_set_total_pv_sell:
+          name: set_total_pv_sell
+          description: >
+            If true, sets PV power sold to grid = total PV power - inverter self-consumption.
+          default: false
+          selector:
+            boolean:
+        emhass_config_lp_solver:
+          name: lp_solver
+          description: >
+            The linear programming solver to use. 'default' uses the built-in solver.
+          default: default
+          selector:
+            select:
+              options:
+                - default
+        emhass_config_lp_solver_path:
+          name: lp_solver_path
+          description: >
+            Path to an external solver (if not using 'default').
+          default: empty
+          selector:
+            select:
+              options:
+                - empty
+        emhass_config_num_threads:
+          name: num_threads
+          description: >
+            Number of threads for the solver (0 = system default).
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1
+              mode: box
+        emhass_config_lp_solver_timeout:
+          name: lp_solver_timeout
+          description: >
+            Maximum time (in seconds) allowed for the optimization solver.
+          default: 45
+          selector:
+            number:
+              min: 30
+              max: 90
+              step: 1
+              mode: box
+        emhass_config_weather_forecast_method:
+          name: weather_forecast_method
+          description: >
+            Source for weather forecast data (e.g., 'open-meteo').
+          default: open-meteo
+          selector:
+            select:
+              options:
+                - open-meteo
+        emhass_config_open_meteo_cache_max_age:
+          name: open_meteo_cache_max_age
+          description: >
+            Cache time (in minutes) for Open-Meteo weather data.
+          default: 30
+          selector:
+            number:
+              min: 10
+              max: 50
+              step: 1
+              mode: box
+        emhass_config_maximum_power_from_grid:
+          name: maximum_power_from_grid
+          description: >
+            The maximum power (in W) that can be drawn from the grid at any time.
+          default: 15000
+          selector:
+            number:
+              min: 5000
+              max: 100000
+              step: 1000
+              mode: box
+        emhass_config_maximum_power_to_grid:
+          name: maximum_power_to_grid
+          description: >
+            The maximum power (in W) that can be fed into the grid at any time.
+          default: 9000
+          selector:
+            number:
+              min: 5000
+              max: 100000
+              step: 1000
+              mode: box
+        emhass_config_inverter_is_hybrid:
+          name: inverter_is_hybrid
+          description: >
+            Set to true if you have a hybrid inverter.
+          default: true
+          selector:
+            boolean:
+        emhass_config_inverter_ac_output_max:
+          name: inverter_ac_output_max
+          description: >
+            Maximum AC output power (in W) of your inverter.
+          default: 1000
+          selector:
+            number:
+              min: 100
+              max: 10000
+              step: 100
+              mode: box
+        emhass_config_inverter_ac_input_max:
+          name: inverter_ac_input_max
+          description: >
+            Maximum AC input power (in W) of your inverter.
+          default: 1000
+          selector:
+            number:
+              min: 100
+              max: 10000
+              step: 100
+              mode: box
+        emhass_config_inverter_efficiency_dc_ac:
+          name: inverter_efficiency_dc_ac
+          description: >
+            Inverter efficiency for DC to AC conversion (e.g., 0.95).
+          default: 1
+          selector:
+            number:
+              min: 0.8
+              max: 1
+              step: 0.01
+              mode: box
+        emhass_config_inverter_efficiency_ac_dc:
+          name: inverter_efficiency_ac_dc
+          description: >
+            Inverter efficiency for AC to DC conversion (e.g., 0.95).
+          default: 1
+          selector:
+            number:
+              min: 0.8
+              max: 1
+              step: 0.01
+              mode: box
+        emhass_config_compute_curtailment:
+          name: compute_curtailment
+          description: >
+            Enable computation of PV curtailment.
+          default: false
+          selector:
+            boolean:
+
+    # --- EMHASS Tariff Configuration
+    grid_emhass_tariff_config:
+      name: EMHASS Tariff Configuration
+      description: >
+        Settings related to energy costs and feed-in tariffs.
+      collapsed: true
+      input:
+        emhass_config_load_cost_forecast_method:
+          name: load_cost_forecast_method
+          description: >
+            Method for retrieving load cost forecasts (e.g., 'hp_hc_periods' for peak/off-peak).
+          default: hp_hc_periods
+          selector:
+            select:
+              options:
+                - hp_hc_periods
+        emhass_config_load_peak_hour_periods:
+          name: load_peak_hour_periods (JSON)
+          description: >
+            JSON definition of peak hour periods.
+          default: '{"period_hp_1": [{"start": "03:00"}, {"end": "04:00"}]}'
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_load_peak_hours_cost:
+          name: load_peak_hours_cost
+          description: >
+            Cost per kWh during peak hours.
+          default: 0.28
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.01
+              mode: box
+        emhass_config_load_offpeak_hours_cost:
+          name: load_offpeak_hours_cost
+          description: >
+            Cost per kWh during off-peak hours.
+          default: 0.28
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.01
+              mode: box
+        emhass_config_production_price_forecast_method:
+          name: production_price_forecast_method
+          description: >
+            Method for retrieving production (feed-in) price forecasts.
+          default: constant
+          selector:
+            select:
+              options:
+                - constant
+        emhass_config_photovoltaic_production_sell_price:
+          name: photovoltaic_production_sell_price
+          description: >
+            The price per kWh you receive for selling PV energy to the grid.
+          default: 0.1
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              mode: box
+
+    # --- EMHASS Solar System Configuration
+    grid_emhass_solar_system_config:
+      name: EMHASS Solar System Configuration
+      description: >
+        Detailed settings for PVLib-based solar forecasting.
+      collapsed: true
+      input:
+        emhass_config_set_use_pv:
+          name: set_use_pv
+          description: >
+            Enable or disable the use of PV forecasts in optimization.
+          default: true
+          selector:
+            boolean:
+        emhass_config_set_use_adjusted_pv:
+          name: set_use_adjusted_pv
+          description: >
+            Enable PV forecast adjustment based on historical data.
+          default: false
+          selector:
+            boolean:
+        emhass_config_adjusted_pv_regression_model:
+          name: adjusted_pv_regression_model
+          description: >
+            Regression model to use for PV adjustment.
+          default: LassoRegression
+          selector:
+            select:
+              options:
+                - LassoRegression
+        emhass_config_adjusted_pv_solar_elevation_threshold:
+          name: adjusted_pv_solar_elevation_threshold
+          description: >
+            Solar elevation threshold for PV adjustment.
+          default: 10
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1
+              mode: box
+        emhass_config_pv_module_model:
+          name: pv_module_model (JSON List)
+          description: >
+            JSON list (as a string) of PV module models (from PVLib).
+            Must be an array, e.g., ["My_Module_Model"] or ["Module_East", "Module_West"].
+          default: '["CSUN_Eurasia_Energy_Systems_Industry_and_Trade_CSUN295_60M"]'
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_pv_inverter_model:
+          name: pv_inverter_model (JSON List)
+          description: >
+            JSON list (as a string) of PV inverter models (from PVLib).
+            Must be an array, e.g., ["My_Inverter_Model"] or ["Inverter_East", "Inverter_West"].
+          default: '["Fronius_International_GmbH__Fronius_Primo_5_0_1_208_240__240V_"]'
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_surface_tilt:
+          name: surface_tilt (JSON List)
+          description: >
+            JSON list (as a string) of panel tilt angles. Must be an array of numbers, e.g., [30] or [30, 45].
+          default: "[27]"
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_surface_azimuth:
+          name: surface_azimuth (JSON List)
+          description: >
+            JSON list (as a string) of panel azimuth angles (180 = South).
+            Must be an array of numbers, e.g., [180] or [180, 205].
+          default: "[205]"
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_modules_per_string:
+          name: modules_per_string (JSON List)
+          description: >
+            JSON list (as a string) of the number of modules per string.
+            Must be an array of numbers, e.g., [9] or [9, 18].
+          default: "[9]"
+          selector:
+            text:
+              type: text
+              multiline: true
+        emhass_config_strings_per_inverter:
+          name: strings_per_inverter (JSON List)
+          description: >
+            JSON list (as a string) of the number of strings per inverter.
+            Must be an array of numbers, e.g., [3] or [3, 6].
+          default: "[3]"
+          selector:
+            text:
+              type: text
+              multiline: true
+
+    # --- EMHASS Battery Configuration
+    grid_emhass_battery_config:
+      name: EMHASS Battery Configuration
+      description: >
+        Settings related to your battery storage system.
+      collapsed: true
+      input:
+        emhass_config_set_use_battery:
+          name: set_use_battery
+          description: >
+            Enable or disable the use of the battery in optimization.
+          default: true
+          selector:
+            boolean:
+        emhass_config_set_nocharge_from_grid:
+          name: set_nocharge_from_grid
+          description: >
+            If true, battery charging from the grid is forbidden.
+          default: true
+          selector:
+            boolean:
+        emhass_config_set_nodischarge_to_grid:
+          name: set_nodischarge_to_grid
+          description: >
+            If true, battery discharging to the grid (selling) is forbidden.
+          default: true
+          selector:
+            boolean:
+        emhass_config_set_battery_dynamic:
+          name: set_battery_dynamic
+          description: >
+            Enable dynamic battery constraints.
+          default: false
+          selector:
+            boolean:
+        emhass_config_battery_dynamic_max:
+          name: battery_dynamic_max
+          description: >
+            Dynamic maximum for battery (if enabled).
+          default: 0.9
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              mode: box
+        emhass_config_battery_dynamic_min:
+          name: battery_dynamic_min
+          description: >
+            Dynamic minimum for battery (if enabled).
+          default: -0.9
+          selector:
+            number:
+              min: -10.0
+              max: 0.0
+              step: 0.1
+              mode: box
+        emhass_config_weight_battery_discharge:
+          name: weight_battery_discharge
+          description: >
+            Cost weight for battery discharging.
+          default: 0.05
+          selector:
+            number:
+              min: 0
+              max: 10
+              step: 0.01
+              mode: box
+        emhass_config_weight_battery_charge:
+          name: weight_battery_charge
+          description: >
+            Cost weight for battery charging.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 10
+              step: 1
+              mode: box
+        emhass_config_battery_discharge_power_max:
+          name: battery_discharge_power_max
+          description: >
+            Maximum battery discharge power (in W).
+          default: 6000
+          selector:
+            number:
+              min: 0
+              max: 22000
+              step: 100
+              mode: box
+        emhass_config_battery_charge_power_max:
+          name: battery_charge_power_max
+          description: >
+            Maximum battery charge power (in W).
+          default: 6000
+          selector:
+            number:
+              min: 0
+              max: 22000
+              step: 100
+              mode: box
+        emhass_config_battery_discharge_efficiency:
+          name: battery_discharge_efficiency
+          description: >
+            Battery discharge efficiency (e.g., 0.95 for 95%).
+          default: 0.95
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.01
+              mode: box
+        emhass_config_battery_charge_efficiency:
+          name: battery_charge_efficiency
+          description: >
+            Battery charge efficiency (e.g., 0.95 for 95%).
+          default: 0.95
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.01
+              mode: box
+        emhass_config_battery_nominal_energy_capacity:
+          name: battery_nominal_energy_capacity
+          description: >
+            The nominal energy capacity of your battery (in Wh).
+          default: 1000
+          selector:
+            number:
+              min: 100
+              max: 30000
+              step: 100
+              mode: box
+        emhass_config_battery_minimum_state_of_charge:
+          name: battery_minimum_state_of_charge
+          description: >
+            The minimum allowed state of charge (e.g., 0.3 for 30%).
+          default: 0.3
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              mode: box
+        emhass_config_battery_maximum_state_of_charge:
+          name: battery_maximum_state_of_charge
+          description: >
+            The maximum allowed state of charge (e.g., 0.9 for 90%).
+          default: 0.9
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              mode: box
+        emhass_config_battery_target_state_of_charge:
+          name: battery_target_state_of_charge
+          description: >
+            The target state of charge for the battery at the end of the optimization.
+          default: 0.6
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              mode: box
+        # ignore_pv_feedback_during_curtailment
+
+# --------------------
+# --- EMHASS Variables
+# --------------------
+
+variables:
+
+  # --- EMHASS Server Variables
+  emhass_rest_name: !input emhass_rest_name
+  emhass_protocol: !input emhass_protocol
+  emhass_host: !input emhass_host
+  emhass_port: !input emhass_port
+  emhass_api_publish: !input emhass_api_publish
+  emhass_api_optim: !input emhass_api_optim
+  emhass_api_save: !input emhass_api_save
+  emhass_api_ml: !input emhass_api_ml
+
+  # --- EMHASS Variables
+  emhass_config_soc_init_raw: !input emhass_config_soc_init
+  emhass_config_soc_init_calc: >
+    {% set raw_value = emhass_config_soc_init_raw | string | trim %}
+    {% if '{{' in raw_value and '}}' in raw_value %}
+      {{ raw_value }}
+    {% else %}
+      {% set single_value = raw_value | float(0) | round(2) %}
+      {{ single_value }}
+    {% endif %}
+  emhass_config_soc_final_raw: !input emhass_config_soc_final
+  emhass_config_soc_final_calc: >
+    {% set raw_value = emhass_config_soc_final_raw | string | trim %}
+    {% if '{{' in raw_value and '}}' in raw_value %}
+      {{ raw_value }}
+    {% else %}
+      {% set single_value = raw_value | float(0) | round(2) %}
+      {{ single_value }}
+    {% endif %}
+  emhass_config_battery_charge_efficiency: !input emhass_config_battery_charge_efficiency
+  emhass_config_battery_charge_power_max: !input emhass_config_battery_charge_power_max
+  emhass_config_battery_discharge_efficiency: !input emhass_config_battery_discharge_efficiency
+  emhass_config_battery_discharge_power_max: !input emhass_config_battery_discharge_power_max
+  emhass_config_battery_dynamic_max: !input emhass_config_battery_dynamic_max
+  emhass_config_battery_dynamic_min: !input emhass_config_battery_dynamic_min
+  emhass_config_battery_maximum_state_of_charge: !input emhass_config_battery_maximum_state_of_charge
+  emhass_config_battery_minimum_state_of_charge: !input emhass_config_battery_minimum_state_of_charge
+  emhass_config_battery_nominal_energy_capacity: !input emhass_config_battery_nominal_energy_capacity
+  emhass_config_battery_target_state_of_charge: !input emhass_config_battery_target_state_of_charge
+  emhass_config_adjusted_pv_regression_model: !input emhass_config_adjusted_pv_regression_model
+  emhass_config_adjusted_pv_solar_elevation_threshold: !input emhass_config_adjusted_pv_solar_elevation_threshold
+  emhass_config_compute_curtailment: !input emhass_config_compute_curtailment
+  emhass_config_continual_publish: !input emhass_config_continual_publish
+  emhass_config_costfun: !input emhass_config_costfun
+  emhass_config_delta_forecast_daily: !input emhass_config_delta_forecast_daily
+  emhass_config_historic_days_to_retrieve: !input emhass_config_historic_days_to_retrieve
+  emhass_config_inverter_ac_input_max: !input emhass_config_inverter_ac_input_max
+  emhass_config_inverter_ac_output_max: !input emhass_config_inverter_ac_output_max
+  emhass_config_inverter_efficiency_ac_dc: !input emhass_config_inverter_efficiency_ac_dc
+  emhass_config_inverter_efficiency_dc_ac: !input emhass_config_inverter_efficiency_dc_ac
+  emhass_config_inverter_is_hybrid: !input emhass_config_inverter_is_hybrid
+  emhass_config_logging_level: !input emhass_config_logging_level
+  emhass_config_lp_solver: !input emhass_config_lp_solver
+  emhass_config_lp_solver_path: !input emhass_config_lp_solver_path
+  emhass_config_lp_solver_timeout: !input emhass_config_lp_solver_timeout
+  emhass_config_maximum_power_from_grid: !input emhass_config_maximum_power_from_grid
+  emhass_config_maximum_power_to_grid: !input emhass_config_maximum_power_to_grid
+  emhass_config_method_ts_round: !input emhass_config_method_ts_round
+  emhass_config_modules_per_string: !input emhass_config_modules_per_string
+  emhass_config_num_threads: !input emhass_config_num_threads
+  emhass_config_open_meteo_cache_max_age: !input emhass_config_open_meteo_cache_max_age
+  emhass_config_optimization_time_step: !input emhass_config_optimization_time_step
+  emhass_config_production_price_forecast_method: !input emhass_config_production_price_forecast_method
+  emhass_config_pv_inverter_model: !input emhass_config_pv_inverter_model
+  emhass_config_pv_module_model: !input emhass_config_pv_module_model
+  emhass_config_set_battery_dynamic: !input emhass_config_set_battery_dynamic
+  emhass_config_set_nocharge_from_grid: !input emhass_config_set_nocharge_from_grid
+  emhass_config_set_nodischarge_to_grid: !input emhass_config_set_nodischarge_to_grid
+  emhass_config_set_total_pv_sell: !input emhass_config_set_total_pv_sell
+  emhass_config_set_use_adjusted_pv: !input emhass_config_set_use_adjusted_pv
+  emhass_config_set_use_battery: !input emhass_config_set_use_battery
+  emhass_config_set_use_pv: !input emhass_config_set_use_pv
+  emhass_config_set_zero_min: !input emhass_config_set_zero_min
+  emhass_config_solar_forecast_kwp: !input emhass_config_solar_forecast_kwp
+  emhass_config_photovoltaic_production_sell_price: !input emhass_config_photovoltaic_production_sell_price
+  emhass_config_sensor_power_load_no_var_loads: !input emhass_config_sensor_power_load_no_var_loads
+  emhass_config_sensor_power_photovoltaics: !input emhass_config_sensor_power_photovoltaics
+  emhass_config_strings_per_inverter: !input emhass_config_strings_per_inverter
+  emhass_config_surface_azimuth: !input emhass_config_surface_azimuth
+  emhass_config_surface_tilt: !input emhass_config_surface_tilt
+  emhass_config_weather_forecast_method: !input emhass_config_weather_forecast_method
+  emhass_config_weight_battery_charge: !input emhass_config_weight_battery_charge
+  emhass_config_weight_battery_discharge: !input emhass_config_weight_battery_discharge
+  emhass_config_get_data_from_home_assistant: !input emhass_config_get_data_from_home_assistant
+  emhass_config_force_update_data: !input emhass_config_force_update_data
+  emhass_config_set_forecast_to_hass: !input emhass_config_set_forecast_to_hass
+  emhass_config_load_offpeak_hours_cost: !input emhass_config_load_offpeak_hours_cost
+  emhass_config_load_peak_hour_periods: !input emhass_config_load_peak_hour_periods
+  emhass_config_load_peak_hours_cost: !input emhass_config_load_peak_hours_cost
+  emhass_config_load_cost_forecast_raw: !input emhass_config_load_cost_forecast
+  emhass_config_load_cost_forecast_calc: >
+    {% set raw_value = emhass_config_load_cost_forecast_raw | string | trim %}
+    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
+    {% set count = (1440 / step_minutes) | int(48) %}
+    {% set potential_list = raw_value | from_json(default=None) %}
+    {% if '{{' in raw_value and '}}' in raw_value %}
+      {{ raw_value }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list | length == count %}
+      {{ raw_value }}
+    {% else %}
+      {% set single_value = raw_value | float(0) | round(2) %}
+      {{ [single_value] * count }}
+    {% endif %}
+  emhass_config_load_cost_forecast_method: !input emhass_config_load_cost_forecast_method
+  emhass_config_load_forecast_method: !input emhass_config_load_forecast_method
+  emhass_config_load_negative: !input emhass_config_load_negative
+  emhass_config_p_pv_forecast_raw: !input emhass_config_p_pv_forecast
+  emhass_config_p_pv_forecast_calc: >
+    {% set raw_value = emhass_config_p_pv_forecast_raw | string | trim %}
+    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
+    {% set count = (1440 / step_minutes) | int(48) %}
+    {% set potential_list = raw_value | from_json(default=None) %}
+    {% if '{{' in raw_value and '}}' in raw_value %}
+      {{ raw_value }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list | length == count %}
+      {{ raw_value }}
+    {% else %}
+      {% set single_value = raw_value | float(0) | round(1) %}
+      {{ [single_value] * count }}
+    {% endif %}
+  list_emhass_deferrable_loads: !input list_emhass_deferrable_loads
+  emhass_config_end_timesteps_of_each_deferrable_load: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set single_constant_in = json_data['si'] | default(true) | bool %}
+      {% set operating_hours_in = json_data['ho'] | default(0) | float(0) | round(1) %}
+      {% set end_timestep_in = json_data['et'] | default(1) | float(0) | round(0) %}
+      {% set current_state_in = json_data['us'] | default('done') | string %}
+      {% if current_state_in in ['running', 'force'] %}
+        {% if single_constant_in %}
+          {% set total_runtime_h = operating_hours_in %}
+        {% else %}
+          {% set total_runtime_h = end_timestep_in / (60 / step_minutes) %}
+        {% endif %}
+        {% set start_time = states[entity_id].last_changed %}
+        {% set end_time = start_time + timedelta(hours=total_runtime_h) %}
+        {% set remaining_seconds = (end_time - now()).total_seconds() %}
+        {% set remaining_minutes = [0, remaining_seconds / 60] | max %}
+        {% set rounded_minutes = (remaining_minutes / step_minutes) | round(0, 'ceil') * step_minutes %}
+        {% set json_value = (rounded_minutes / step_minutes) | default(1) | float(0) | round(0) %}
+      {% else %}
+        {% set json_value = end_timestep_in %}
+      {% endif %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_minimum_power_of_deferrable_loads: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['mp'] | default(0) | float(0) | round(0) %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_nominal_power_of_deferrable_loads: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['po'] | default(0) | float(0) | round(0) %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_number_of_deferrable_loads: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {{ load_list | count | int(0) }}
+  emhass_config_operating_hours_of_each_deferrable_load: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set operating_hours_in = json_data['ho'] | default(0) | float(0) | round(1) %}
+      {% set end_timestep_in = json_data['et'] | default(1) | float(0) | round(0) %}
+      {% set current_state_in = json_data['us'] | default('done') | string %}
+      {% if current_state_in in ['running', 'force'] %}
+        {% set start_time = states[entity_id].last_changed %}
+        {% set total_runtime_h = operating_hours_in %}
+        {% set end_time = start_time + timedelta(hours=total_runtime_h) %}
+        {% set remaining_seconds = (end_time - now()).total_seconds() %}
+        {% set remaining_minutes = [0, remaining_seconds / 60] | max %}
+        {% set rounded_minutes = (remaining_minutes / step_minutes) | round(0, 'ceil') * step_minutes %}
+        {% set json_value = rounded_minutes / 60 | round(2) %}
+      {% elif current_state_in in ['wait', 'ready'] %}
+        {% set json_value = operating_hours_in %}
+      {% else %}
+        {% set json_value = 0 %}
+      {% endif %}
+      {% set rounded_json_value = ((json_value * 2) | round(0)) / 2 %}
+      {% set values.data = values.data + [rounded_json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_set_deferrable_load_single_constant: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['si'] | default(true) | bool %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_set_deferrable_startup_penalty: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['pe'] | default(0) | float(0) | round(0) %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_start_timesteps_of_each_deferrable_load: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set current_state_in = json_data['us'] | default('done') | string %}
+      {% if current_state_in in ['running', 'force'] %}
+        {% set json_value = 0 %}
+      {% elif current_state_in in ['wait', 'ready'] %}
+        {% set json_value = json_data['st'] | default(0) | float(0) | round(0) %}
+      {% else %}
+        {% set json_value = 0 %}
+      {% endif %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_treat_deferrable_load_as_semi_cont: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['se'] | default(false) | bool %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_config_trigger_status: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set json_data = states(entity_id) | from_json(default={}) %}
+      {% set json_value = json_data['us'] | default("done") | string %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+  emhass_run_optim: >
+    {% set load_list = list_emhass_deferrable_loads %}
+    {% set time_delta = now() - timedelta(minutes=6) %}
+    {% set values = namespace(data=[]) %}
+    {% for entity_id in load_list %}
+      {% set start_time = states[entity_id].last_changed %}
+      {% if start_time is not none and start_time > time_delta %}
+        {% set json_value = true %}
+      {% else %}
+        {% set json_value = false %}
+      {% endif %}
+      {% set values.data = values.data + [json_value] %}
+    {% endfor %}
+    {{ values.data }}
+
+  # --- EMHASS Payloads
+  payload_optim: >-
+    {% set payload = {
+      "soc_init": emhass_config_soc_init_calc,
+      "soc_final": emhass_config_soc_final_calc,
+      "load_cost_forecast": emhass_config_load_cost_forecast_calc,
+      "p_pv_forecast": emhass_config_p_pv_forecast_calc,
+      "pv_power_forecast": emhass_config_p_pv_forecast_calc,
+      "end_timesteps_of_each_deferrable_load": emhass_config_end_timesteps_of_each_deferrable_load,
+      "minimum_power_of_deferrable_loads": emhass_config_minimum_power_of_deferrable_loads,
+      "nominal_power_of_deferrable_loads": emhass_config_nominal_power_of_deferrable_loads,
+      "operating_hours_of_each_deferrable_load": emhass_config_operating_hours_of_each_deferrable_load,
+      "set_deferrable_load_single_constant": emhass_config_set_deferrable_load_single_constant,
+      "set_deferrable_startup_penalty": emhass_config_set_deferrable_startup_penalty,
+      "start_timesteps_of_each_deferrable_load": emhass_config_start_timesteps_of_each_deferrable_load,
+      "treat_deferrable_load_as_semi_cont": emhass_config_treat_deferrable_load_as_semi_cont
+    } %}
+    {{ payload | to_json }}
+  payload_publish: {}
+  payload_save: >-
+    {% set payload = {
+      "soc_init": emhass_config_soc_init_calc,
+      "soc_final": emhass_config_soc_final_calc,
+      "battery_charge_efficiency": emhass_config_battery_charge_efficiency,
+      "battery_charge_power_max": emhass_config_battery_charge_power_max,
+      "battery_discharge_efficiency": emhass_config_battery_discharge_efficiency,
+      "battery_discharge_power_max": emhass_config_battery_discharge_power_max,
+      "battery_dynamic_max": emhass_config_battery_dynamic_max,
+      "battery_dynamic_min": emhass_config_battery_dynamic_min,
+      "battery_maximum_state_of_charge": emhass_config_battery_maximum_state_of_charge,
+      "battery_minimum_state_of_charge": emhass_config_battery_minimum_state_of_charge,
+      "battery_nominal_energy_capacity": emhass_config_battery_nominal_energy_capacity,
+      "battery_target_state_of_charge": emhass_config_battery_target_state_of_charge,
+      "adjusted_pv_regression_model": emhass_config_adjusted_pv_regression_model,
+      "adjusted_pv_solar_elevation_threshold": emhass_config_adjusted_pv_solar_elevation_threshold,
+      "compute_curtailment": emhass_config_compute_curtailment,
+      "continual_publish": emhass_config_continual_publish,
+      "costfun": emhass_config_costfun,
+      "delta_forecast_daily": emhass_config_delta_forecast_daily,
+      "historic_days_to_retrieve": emhass_config_historic_days_to_retrieve,
+      "inverter_ac_input_max": emhass_config_inverter_ac_input_max,
+      "inverter_ac_output_max": emhass_config_inverter_ac_output_max,
+      "inverter_efficiency_ac_dc": emhass_config_inverter_efficiency_ac_dc,
+      "inverter_efficiency_dc_ac": emhass_config_inverter_efficiency_dc_ac,
+      "inverter_is_hybrid": emhass_config_inverter_is_hybrid,
+      "logging_level": emhass_config_logging_level,
+      "lp_solver": emhass_config_lp_solver,
+      "lp_solver_path": emhass_config_lp_solver_path,
+      "lp_solver_timeout": emhass_config_lp_solver_timeout,
+      "maximum_power_from_grid": emhass_config_maximum_power_from_grid,
+      "maximum_power_to_grid": emhass_config_maximum_power_to_grid,
+      "method_ts_round": emhass_config_method_ts_round,
+      "modules_per_string": emhass_config_modules_per_string | from_json,
+      "num_threads": emhass_config_num_threads,
+      "open_meteo_cache_max_age": emhass_config_open_meteo_cache_max_age,
+      "optimization_time_step": emhass_config_optimization_time_step | int(30),
+      "production_price_forecast_method": emhass_config_production_price_forecast_method,
+      "pv_inverter_model": emhass_config_pv_inverter_model | from_json,
+      "pv_module_model": emhass_config_pv_module_model | from_json,
+      "set_battery_dynamic": emhass_config_set_battery_dynamic,
+      "set_nocharge_from_grid": emhass_config_set_nocharge_from_grid,
+      "set_nodischarge_to_grid": emhass_config_set_nodischarge_to_grid,
+      "set_total_pv_sell": emhass_config_set_total_pv_sell,
+      "set_use_adjusted_pv": emhass_config_set_use_adjusted_pv,
+      "set_use_battery": emhass_config_set_use_battery,
+      "set_use_pv": emhass_config_set_use_pv,
+      "set_zero_min": emhass_config_set_zero_min,
+      "solar_forecast_kwp": emhass_config_solar_forecast_kwp,
+      "photovoltaic_production_sell_price": emhass_config_photovoltaic_production_sell_price,
+      "sensor_power_load_no_var_loads": emhass_config_sensor_power_load_no_var_loads,
+      "sensor_power_photovoltaics": emhass_config_sensor_power_photovoltaics,
+      "sensor_replace_zero": [ emhass_config_sensor_power_photovoltaics | string ],
+      "strings_per_inverter": emhass_config_strings_per_inverter | from_json,
+      "surface_azimuth": emhass_config_surface_azimuth | from_json,
+      "surface_tilt": emhass_config_surface_tilt | from_json,
+      "weather_forecast_method": emhass_config_weather_forecast_method,
+      "weight_battery_charge": emhass_config_weight_battery_charge,
+      "weight_battery_discharge": emhass_config_weight_battery_discharge,
+      "get_data_from_home_assistant": emhass_config_get_data_from_home_assistant,
+      "force_update_data": emhass_config_force_update_data,
+      "set_forecast_to_hass": emhass_config_set_forecast_to_hass,
+      "load_offpeak_hours_cost": emhass_config_load_offpeak_hours_cost,
+      "load_peak_hour_periods": emhass_config_load_peak_hour_periods | from_json,
+      "load_peak_hours_cost": emhass_config_load_peak_hours_cost,
+      "load_cost_forecast": emhass_config_load_cost_forecast_calc,
+      "load_cost_forecast_method": emhass_config_load_cost_forecast_method,
+      "load_forecast_method": emhass_config_load_forecast_method,
+      "load_negative": emhass_config_load_negative,
+      "p_pv_forecast": emhass_config_p_pv_forecast_calc,
+      "pv_power_forecast": emhass_config_p_pv_forecast_calc,
+      "sensor_linear_interp": [
+        emhass_config_sensor_power_photovoltaics | string,
+        emhass_config_sensor_power_load_no_var_loads | string
+        ],
+      "end_timesteps_of_each_deferrable_load": emhass_config_end_timesteps_of_each_deferrable_load,
+      "minimum_power_of_deferrable_loads": ([0] * emhass_config_number_of_deferrable_loads),
+      "nominal_power_of_deferrable_loads": ([0] * emhass_config_number_of_deferrable_loads),
+      "number_of_deferrable_loads": emhass_config_number_of_deferrable_loads,
+      "operating_hours_of_each_deferrable_load": ([0] * emhass_config_number_of_deferrable_loads),
+      "set_deferrable_load_single_constant": emhass_config_set_deferrable_load_single_constant,
+      "set_deferrable_startup_penalty": emhass_config_set_deferrable_startup_penalty,
+      "start_timesteps_of_each_deferrable_load": emhass_config_start_timesteps_of_each_deferrable_load,
+      "treat_deferrable_load_as_semi_cont": emhass_config_treat_deferrable_load_as_semi_cont
+    } %}
+    {{ payload | to_json }}
+  payload_forecast: {}
+
+# -------------------
+# --- EMHASS Triggers
+# -------------------
+
+triggers:
+
+  # --- Publish and Optim Data
+  - trigger: time_pattern
+    minutes: !input publish_minutes_timer
+    seconds: 18
+    id: publish
+    enabled: !input enable_publish_timer
+
+  # --- Save Config
+  - trigger: time_pattern
+    hours: !input save_timer_hours
+    minutes: !input save_timer_minutes
+    seconds: 18
+    id: save
+    enabled: !input enable_save_timer
+
+  # --- Run Forecast
+  - trigger: time_pattern
+    hours: !input forecast_timer_hours
+    minutes: !input forecast_timer_minutes
+    seconds: 18
+    id: forecast
+    enabled: !input enable_forecast_timer
+
+# ---------------------
+# --- EMHASS Conditions
+# ---------------------
+
+conditions: []
+
+# ------------------
+# --- EMHASS Actions
+# ------------------
+
+actions:
+
+  # --- Run optim and publish
+  - alias: Run optim and publish
+    if:
+      - condition: trigger
+        id:
+          - publish
+    then:
+      - if:
+          - condition: template
+            value_template: >
+              {% set run_optim_check = (emhass_run_optim | select('equalto', true) | list) | length > 0 %}
+              {% set is_every_four_hours = (now().hour % 4 == 0) and (now().minute == 0) %}
+              {{ run_optim_check or is_every_four_hours }}
+        then:
+          - action: system_log.write
+            data:
+              level: debug
+              message: "Log emhass_basic operating_hours: {{ emhass_config_operating_hours_of_each_deferrable_load }}"
+              logger: 'blueprint.emhass_basic'
+          - action: system_log.write
+            data:
+              level: debug
+              message: "Log emhass_basic end_timestamps: {{ emhass_config_end_timesteps_of_each_deferrable_load }}"
+              logger: 'blueprint.emhass_basic'
+          - action: !input emhass_rest_name
+            data:
+              protocol: !input emhass_protocol
+              host: !input emhass_host
+              port: !input emhass_port
+              api: !input emhass_api_optim
+              payload: "{{ payload_optim }}"
+            response_variable: response_payload_optim
+          - delay:
+              hours: 0
+              minutes: 0
+              seconds: 5
+              milliseconds: 0
+      - action: !input emhass_rest_name
+        data:
+          protocol: !input emhass_protocol
+          host: !input emhass_host
+          port: !input emhass_port
+          api: !input emhass_api_publish
+          payload: "{{ payload_publish }}"
+        response_variable: response_payload_publish
+
+  # --- Run Save
+  - alias: Run emhass save
+    if:
+      - condition: trigger
+        id:
+          - save
+    then:
+      - action: !input emhass_rest_name
+        data:
+          protocol: !input emhass_protocol
+          host: !input emhass_host
+          port: !input emhass_port
+          api: !input emhass_api_save
+          payload: "{{ payload_save }}"
+        response_variable: response_publish_save
+
+  # --- Run forecast (ML)
+  - alias: Run emhass forecast
+    if:
+      - condition: trigger
+        id:
+          - forecast
+    then:
+      - action: !input emhass_rest_name
+        data:
+          protocol: !input emhass_protocol
+          host: !input emhass_host
+          port: !input emhass_port
+          api: !input emhass_api_ml
+          payload: "{{ payload_forecast }}"
+        response_variable: response_publish_forecast
+
+# -------------------
+# --- Automation Mode
+# -------------------
+
+mode: single

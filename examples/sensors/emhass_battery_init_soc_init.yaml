@@ -1,0 +1,13 @@
+- sensor:
+  - name: "EMHASS battery init (soc_init)"
+    unique_id: emhass_battery_init_soc_init
+    state: >
+      {%- set min_soc = 10 -%}
+      {%- set max_soc = 100 -%}
+      {%- set reported_soc = states('sensor.scb_battery_soc') | float(0) -%}
+
+      {# Die Formel skaliert den Wert linear von 5% auf 0% und 100% auf 100% #}
+      {%- set mapped_soc = (reported_soc - min_soc) / (max_soc - min_soc) -%}
+
+      {# Stellt sicher, dass der Wert nie unter 0 fällt und auf zwei Dezimalstellen gerundet wird #}
+      {{ [mapped_soc, 0] | max | round(2) }}

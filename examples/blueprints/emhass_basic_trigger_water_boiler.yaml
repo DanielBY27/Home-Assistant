@@ -1,0 +1,25 @@
+alias: Water-Bioler EMHASS Trigger
+description: ""
+use_blueprint:
+  path: emhass_basic_trigger.yaml
+  input:
+    trigger_strategy: "5"
+    input_status: input_select.water_bioler_emhass_status
+    input_emhass: input_text.water_bioler_emhass_json
+    input_trigger: sensor.p_deferrable3
+    update_sensor: switch.heisswasser_switch
+    nominal_powers: 1500
+    operating_hours: "6"
+    start_timesteps: 0
+    end_timesteps: "24"
+    deferrable_load_as_semi_cont: false
+    deferrable_load_single_constant: false
+    minimum_power_deferrable_load: 100
+    deferrable_startup_penalty: 10
+    notify_group: parents_mobile_phones
+    wait_sensor: sensor.scb_battery_soc
+    wait_value: 95
+    stop_sensor: sensor.scb_battery_soc
+    stop_value: 90
+    allow_allways_to_done: true
+    deferrable_load_single_constant_work: "False"

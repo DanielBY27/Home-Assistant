@@ -1,0 +1,32 @@
+- sensor:
+  - name: go-eCharger EMHASS Trigger
+    unique_id: emhass_go-echarger_trigger
+    unit_of_measurement: Wh
+    device_class: energy
+    state: >
+      {% set target_soc_good_day = 90 %}
+      {% set target_soc_bad_day = 70 %}
+      {% set batt_capacity_wh = 50000 %}
+      {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') | bool %}
+      {% set good_day = is_state('binary_sensor.energy_config_good_day', 'on') | bool %}
+      {% set goe_loaded_wh = (states('sensor.goe_297534_wh') | float(0)) * 1000  %}
+      {% set current_soc_pct = states('sensor.vr3ezzkxzpj688123_batterie') | float(0) %}
+
+      {% if good_day %}
+        {% set target_soc_pct = target_soc_good_day %}
+      {% else %}
+        {% set target_soc_pct = target_soc_bad_day %}
+      {% endif %}
+
+      {% set current_energy_wh = batt_capacity_wh * (current_soc_pct / 100) %}
+      {% set corrected_current_energy_wh = current_energy_wh + goe_loaded_wh %}
+      {% set target_energy_wh = batt_capacity_wh * (target_soc_pct / 100) %}
+
+      {% if goe_plugged and corrected_current_energy_wh < target_energy_wh %}
+        {% set energy_needed_wh = target_energy_wh - corrected_current_energy_wh %}
+        {# EMHASS Min-Trigger -> 10 #}
+        {% set final_energy_needed = [energy_needed_wh, 10] | max %}
+        {{ final_energy_needed | round(0) }}
+      {% else %}
+        {{ 0 }}
+      {% endif %}

@@ -1,0 +1,30 @@
+- sensor:
+  - name: "EMHASS config - home_power_no_var_loads"
+    unique_id: emhass_config_home_power_no_var_loads
+    unit_of_measurement: W
+    device_class: power
+    state: >
+      {%- set total_power = states('sensor.scb_home_power') | float(0) -%}
+      {%- set min_power_static = 200 -%}
+
+      {%- set fixed_usage_novar_loads = [
+        states('sensor.gefrierschrank_leistung') | int(0),
+        states('sensor.kuhlschrank_leistung') | int(0),
+        states('sensor.tabletmonitor_leistung') | int(0),
+        states('sensor.waschmaschine_leistung') | int(0),
+        states('sensor.tz3000_2putqrmw_ts011f_leistung_2') | int(0)
+      ] -%}
+      {%- set novar_loads_sum = fixed_usage_novar_loads | sum -%}
+      {%- set effective_min_power = [min_power_static, novar_loads_sum] | max -%}
+
+      {%- set fixed_usage_var_loads = [
+        states('sensor.geschirrspuler_leistung') | int(0),
+        states('sensor.tz3000_2putqrmw_ts011f_leistung') | int(0),
+        states('sensor.waschmaschine_leistung_2') | int(0),
+        states('sensor.p_deferrable3') | int(0),
+        states('sensor.goe_297534_nrg_11') | int(0)
+      ] -%}
+      {%- set var_loads_sum = fixed_usage_var_loads | sum -%}
+      {%- set calculated_base_load = total_power - var_loads_sum -%}
+
+      {{ [calculated_base_load, effective_min_power] | max | round(0) }}

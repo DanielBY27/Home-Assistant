@@ -1,0 +1,27 @@
+- sensor:
+  - name: go-eCharger Charging Power for EMHASS
+    unique_id: emhass_go-echarger_power
+    unit_of_measurement: W
+    device_class: power
+    state: >
+      {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') | bool %}
+      {% set emhass_load_opt = states('sensor.p_deferrable4') | float(0) %}
+      {% set wallbox_strategy_value = states('input_select.wallbox_load_strategy') | default('Eco') %}
+      {% set goe_power_max = 11000 %}
+      {% set grid_power_val = states('sensor.scb_home_power_from_grid') | float(0) %}
+      {% set current_feed_in = [-1 * grid_power_val, 0] | max %}
+      {% if wallbox_strategy_value.startswith('Fast') %}
+        {% set wallbox_target = wallbox_strategy_value | regex_findall_index('[0-9]+') | default(6) | int %}
+      {% else %}
+        {% if emhass_load_opt > 0 %}
+          {% set target_after_pv_check = [emhass_load_opt, current_feed_in] | max %}
+          {% set wallbox_target = [target_after_pv_check, goe_power_max] | min %}
+        {% else %}
+          {% set wallbox_target = 0 %}
+        {% endif %}
+      {% endif %}
+      {% if goe_plugged %}
+        {{ [wallbox_target, 0] | max | round(0) }}
+      {% else %}
+        {{ 0 }}
+      {% endif %}

@@ -1,0 +1,33 @@
+alias: HA Datenbank Purge
+description: ""
+triggers:
+  - trigger: time
+    at: "23:00:00"
+    weekday:
+      - sun
+conditions: []
+actions:
+  - action: recorder.purge_entities
+    metadata: {}
+    data:
+      keep_days: 1
+      domains:
+        - sun
+        - weather
+        - input_select
+        - binary_sensor
+        - input_number
+        - input_text
+        - input_boolean
+        - automation
+      entity_id:
+        - sensor.geschirrspulerstatistik10
+        - sensor.waschmaschinestatistik10
+        - sensor.waschetrocknerstatistik10
+        - sensor.emhass_battery_grid_import
+        - sensor.energy_config_good_day_calculator
+        - sensor.family_group_count_present
+        - sensor.emhass_go_echarger_trigger
+        - sensor.emhass_go_echarger_power
+        - sensor.kostal_load_from_gid_modbus
+mode: single

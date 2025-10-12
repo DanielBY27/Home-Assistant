@@ -1,0 +1,89 @@
+alias: EMHASS Basic Automation
+description: ""
+use_blueprint:
+  path: emhass_basic.yaml
+  input:
+    emhass_config_load_cost_forecast: "0.3"
+    emhass_config_p_pv_forecast: >-
+      {% set today = state_attr('sensor.solcast_pv_forecast_prognose_heute',
+      'detailedForecast') %}
+
+      {% set tomorrow = state_attr('sensor.solcast_pv_forecast_prognose_morgen',
+      'detailedForecast') %}
+
+      {% set now = now() %}
+
+      {% if today is not none and tomorrow is not none %}
+        {% set combined_forecast = today + tomorrow %}
+        {% set future_forecast_watts = namespace(data=[]) %}
+        {% for item in combined_forecast %}
+          {% if as_datetime(item.period_start) >= now %}
+            {% set pv_estimate_w = (item.pv_estimate | float(0) * 1000) | round(2) %}
+            {% set future_forecast_watts.data = future_forecast_watts.data + [pv_estimate_w] %}
+          {% endif %}
+        {% endfor %}
+        {{ future_forecast_watts.data[:48] }}
+      {% else %}
+        {{ ([0] * 48) }}
+      {% endif %}
+    emhass_config_soc_init: |-
+      {%- set min_soc = 5 -%}
+      {%- set max_soc = 100 -%}
+      {%- set reported_soc = states('sensor.scb_battery_soc') | float(0) -%}
+      {%- set mapped_soc = (reported_soc - min_soc) / (max_soc - min_soc) -%}
+      {{ [mapped_soc, 0] | max | round(2) }}
+    emhass_config_soc_final: >-
+      {%- set current_time = now().time() -%}
+
+      {%- set sunrise_time = (state_attr('sun.sun', 'next_rising') | as_datetime
+      | as_local).time() -%}
+
+      {%- set sunset_time = (state_attr('sun.sun', 'next_setting') | as_datetime
+      | as_local).time() -%}
+
+      {%- set goog_day = states('binary_sensor.energy_config_good_day') -%}
+
+      {%- if goog_day -%}
+        {%- set night_soc = 0.3 -%}
+        {%- set first_half_day_soc = 0.45 -%}
+        {%- set second_half_day_soc = 0.75 -%}
+      {%- else -%}
+        {%- set night_soc = 0.15 -%}
+        {%- set first_half_day_soc = 0.2 -%}
+        {%- set second_half_day_soc = 0.25 -%}
+      {%- endif -%}
+
+      {%- if current_time > sunset_time or current_time < sunrise_time -%}
+        {{ night_soc }}
+      {%- else -%}
+        {%- set day_length_seconds = (sunset_time.hour * 3600 + sunset_time.minute * 60) - (sunrise_time.hour * 3600 + sunrise_time.minute * 60) -%}
+        {%- if day_length_seconds < 0 -%}
+          {%- set day_length_seconds = day_length_seconds + 86400 -%}
+        {%- endif -%}
+        {%- set mid_day_seconds = (sunrise_time.hour * 3600 + sunrise_time.minute * 60) + (day_length_seconds / 2) -%}
+        {%- if (current_time.hour * 3600 + current_time.minute * 60) < mid_day_seconds -%}
+          {{ first_half_day_soc }}
+        {%- else -%}
+          {{ second_half_day_soc }}
+        {%- endif -%}
+      {%- endif -%}
+    list_emhass_deferrable_loads:
+      - input_text.dishwasher_emhass_json
+      - input_text.tumble_dryer_emhass_json
+      - input_text.washing_machine_emhass_json
+      - input_text.water_bioler_emhass_json
+      - input_text.wallbox_emhass_json
+      - input_text.pv_battery_emhass_json
+    emhass_config_battery_discharge_power_max: 6000
+    emhass_config_battery_charge_power_max: 6000
+    emhass_config_battery_nominal_energy_capacity: 18000
+    emhass_config_sensor_power_photovoltaics: sensor.scb_solar_power
+    emhass_config_sensor_power_load_no_var_loads: sensor.emhass_config_home_power_no_var_loads
+    emhass_config_load_forecast_method: mlforecaster
+    save_timer_hours: "5"
+    save_timer_minutes: "28"
+    enable_save_timer: true
+    enable_forecast_timer: true
+    forecast_timer_hours: "5"
+    forecast_timer_minutes: "38"
+    enable_publish_timer: true

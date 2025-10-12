@@ -1,0 +1,16 @@
+# Git Ignore
+prompt.txt
+*.log
+*.sqlite
+*.sqlite-wal
+*.db
+__pycache__/
+*.pyc
+
+# IDE/Editor
+.vscode/ # VS Code Workspace-Einstellungen
+.idea/ # JetBrains IDEs
+*~
+
+# macOS
+.DS_Store

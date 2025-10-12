@@ -1,0 +1,30 @@
+- sensor:
+  - name: "EMHASS battery load from grid"
+    unique_id: emhass_battery_grid_import
+    unit_of_measurement: W
+    device_class: power
+    state: >
+      {% set battery_capacity = (states('input_number.energy_config_battery_size_in_kwh') | float(0)) * 1000 %}
+      {% set min_soc_pct = states('input_number.energy_config_battery_load_grid_min_soc') | float(20) %}
+      {% set max_soc_pct = states('input_number.energy_config_battery_load_grid_max_soc') | float(80) %}
+      {% set current_soc_pct = (states('sensor.emhass_battery_init_soc_init') | float(0) * 100) | float(0) %}
+      {% set current_soc_wh = (current_soc_pct / 100) * battery_capacity %}
+
+      {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.5 %}
+      {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.5 %}
+
+      {# Berechne den Energie-Fehlbetrag für die nächsten 24h #}
+      {% set energy_deficit = consumption_forecast_24h - pv_forecast_24h %}
+
+      {# Ziel-SOC ist der Fehlbetrag plus der Sicherheits-Puffer #}
+      {% set target_soc_wh = max(0, energy_deficit) + (min_soc_pct / 100 * battery_capacity) %}
+
+      {# Lade aber maximal bis zum eingestellten "Platz für Sonne"-Level #}
+      {% set max_charge_wh = (max_soc_pct / 100 * battery_capacity) %}
+      {% set effective_target_wh = min(target_soc_wh, max_charge_wh) %}
+
+      {# Die benötigte Ladung ist das Ziel minus dem, was schon da ist #}
+      {% set charge_needed = effective_target_wh - current_soc_wh %}
+
+      {# Das Ergebnis kann nicht negativ sein #}
+      {{ max(0, charge_needed) | round(0) }}

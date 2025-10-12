@@ -1,0 +1,103 @@
+alias: EMHASS Deferrable Load Controller for go-echarger
+description: ""
+use_blueprint:
+  path: emhass_basic_trigger_go_echarger.yaml
+  input:
+    trigger_strategy: "5"
+    input_status: input_select.wallbox_emhass_status
+    input_emhass: input_text.wallbox_emhass_json
+    input_trigger: sensor.p_deferrable4
+    skipp_wait_to_force: false
+    nominal_powers: 11000
+    operating_hours: >-
+      {% set nominal_power_w = 11000 %}
+
+      {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
+      float(0) %}
+
+      {% set double_hours_needed = ((power_needed / nominal_power_w) * 2) |
+      round(0) %}
+
+      {% set hours_needed = double_hours_needed / 2 %}
+
+      {{ [hours_needed, 0.5] | max | round(2) }}
+    start_timesteps: 0
+    end_timesteps: >-
+      {# Wir rechnen nicht mit 11kW sondern lassen EMHASS luft um die beste Zeit
+      zu ermitteln #}
+
+      {% set nominal_power_w = 7000 %}
+
+      {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
+      float(0) %}
+
+      {% set max_index = 48 %}
+
+      {% set seconds_per_timestep = 30 * 60 %}
+
+      {% set current_dt = now() %}
+
+      {% set min_timesteps_needed = (power_needed / nominal_power_w * 2) |
+      round(0, 'ceil') | int %}
+
+      {% set target_times_h_m_s = ["13:00:00", "18:00:00", "05:00:00"] %}
+
+      {# -------------------- TEST-BEREICH START -------------------- #}
+
+      {# set current_dt = now().replace(hour=13, minute=0, second=0,
+      microsecond=0) #}
+
+      {# set min_timesteps_needed = 14 #}
+
+      {# -------------------- TEST-BEREICH END ---------------------- #}
+
+      {% set current_time_ts = as_timestamp(current_dt) %}
+
+      {% set min_end_seconds_needed = min_timesteps_needed *
+      seconds_per_timestep %}
+
+      {% set min_end_ts = current_time_ts + min_end_seconds_needed %}
+
+      {% set ns = namespace(valid_end_timesteps=[max_index]) %}
+
+      {% for target_time_str in target_times_h_m_s %}
+        {% set target_hour = target_time_str.split(':')[0] | int %}
+        {% set target_minute = target_time_str.split(':')[1] | int %}
+        {% set today_target_dt = current_dt.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0) %}
+        {% set tomorrow_target_dt = today_target_dt + timedelta(days=1) %}
+        {% set check_timestamps = [as_timestamp(today_target_dt), as_timestamp(tomorrow_target_dt)] %}
+        {% for target_ts in check_timestamps %}
+          {% if target_ts >= min_end_ts %}
+            {% set delta_seconds = target_ts - current_time_ts %}
+            {% set final_timestep = (delta_seconds / seconds_per_timestep) | round(0) | int %}
+            {% set ns.valid_end_timesteps = ns.valid_end_timesteps + [final_timestep] %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+
+      {% set final_emhass_timestep = ns.valid_end_timesteps | min %}
+
+      {{ [final_emhass_timestep, 1] | max }}
+    minimum_power_deferrable_load: 4200
+    deferrable_startup_penalty: 2
+    notify_group: parents_mobile_phones
+    wait_sensor: sensor.emhass_go_echarger_trigger
+    wait_value: 1
+    stop_sensor: sensor.emhass_go_echarger_trigger
+    stop_value: 1
+    deferrable_load_as_semi_cont: false
+    deferrable_load_single_constant: false
+    deferrable_load_single_constant_work: >-
+      {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') |
+      bool %}
+
+      {% if goe_plugged %}
+        {{ "True" }}
+      {% else %}
+        {{ "False" }}
+      {% endif %}
+    allow_allways_to_done: true
+    goe_pluged_binary_sensor: binary_sensor.goe_297534_car_0
+    goe_default_mode_sensor: input_select.wallbox_load_strategy
+    goe_power_number_sensor: number.goe_297534_amp
+    goe_allow_charging_select: select.goe_297534_frc
