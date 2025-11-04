@@ -10,8 +10,8 @@
       {% set current_soc_pct = (states('sensor.emhass_battery_init_soc_init') | float(0) * 100) | float(0) %}
       {% set current_soc_wh = (current_soc_pct / 100) * battery_capacity %}
 
-      {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.5 %}
-      {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.5 %}
+      {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.25 %}
+      {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.25 %}
 
       {# Berechne den Energie-Fehlbetrag für die nächsten 24h #}
       {% set energy_deficit = consumption_forecast_24h - pv_forecast_24h %}

@@ -335,11 +335,14 @@ blueprint:
           name: optimization_time_step
           description: >
             The time step in minutes for optimization (e.g., 30). This MUST match the setting in your 'Deferrable Load' blueprints.
+            **Important**: If this is changed, the `start` and `end timestamps` in the load controllers must be adjusted (30 minutes = 2 units, 15 minutes = 4 units per hour).
+            In the automation controller, `load_cost_forecast` and `p_pv_forecast` must be adjusted (30 minutes = 48 entries, 15 minutes = 96 entries in the array).
           default: "30"
           selector:
             select:
               options:
                 - "30"
+                - "15"
         emhass_config_historic_days_to_retrieve:
           name: historic_days_to_retrieve
           description: >
@@ -1256,7 +1259,30 @@ variables:
       "treat_deferrable_load_as_semi_cont": emhass_config_treat_deferrable_load_as_semi_cont
     } %}
     {{ payload | to_json }}
-  payload_forecast: {}
+  payload_forecast: >-
+    {% set step = (emhass_config_optimization_time_step | int(30)) %}
+    {% set hist_days = (emhass_config_historic_days_to_retrieve | int(9)) %}
+    {% set steps_per_day = (1440 / step) | int %}
+    {% if hist_days >= 14 %}
+      {% set train_days = 7 %}
+    {% else %}
+      {% set train_days = 4 %}
+    {% endif %}
+    {% set num_lags = steps_per_day %}
+    {% set split_date_delta_hours = (train_days * 24) | int %}
+    {% set min_needed_days = train_days + 1 %}
+    {% if hist_days < min_needed_days %}
+      {% set hist_days = min_needed_days %}
+    {% endif %}
+    {% set payload = {
+        "historic_days_to_retrieve": hist_days ,
+        "var_model": emhass_config_sensor_power_load_no_var_loads | string,
+        "sklearn_model": "KNeighborsRegressor",
+        "num_lags": num_lags,
+        "split_date_delta": split_date_delta_hours | string + "h",
+        "perform_backtest": false
+      } %}
+    {{ payload | to_json }}
 
 # -------------------
 # --- EMHASS Triggers

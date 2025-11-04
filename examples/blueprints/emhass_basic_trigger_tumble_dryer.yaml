@@ -11,10 +11,11 @@ use_blueprint:
     wait_value: 500
     stop_sensor: sensor.waschetrocknerstatistik10
     stop_value: 5
-    nominal_powers: 1500
-    operating_hours: "2"
+    nominal_powers: 1600
+    operating_hours: "1.5"
     start_timesteps: 0
-    end_timesteps: 10
+    end_timesteps: "16"
     minimum_power_deferrable_load: 400
     notify_group: parents_mobile_phones
     notify_done: Wäschetrockner ist fertig!
+    emhass_config_optimization_time_step: "15"

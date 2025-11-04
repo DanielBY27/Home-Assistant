@@ -276,11 +276,14 @@ blueprint:
           name: Optimization Time Step (Minutes)
           description: >
             The `optimization_time_step` from your EMHASS configuration. **MUST** match the value in your `EMHASS Basic Automation` (e.g., 30).
+            **Important**: If this is changed, the `start` and `end timestamps` in the load controllers must be adjusted (30 minutes = 2 units, 15 minutes = 4 units per hour).
+            In the automation controller, `load_cost_forecast` and `p_pv_forecast` must be adjusted (30 minutes = 48 entries, 15 minutes = 96 entries in the array).
           default: "30"
           selector:
             select:
               options:
                 - "30"
+                - "15"
         nominal_powers:
           name: Nominal Power (po)
           description: >

@@ -11,7 +11,7 @@ use_blueprint:
     nominal_powers: 1500
     operating_hours: "6"
     start_timesteps: 0
-    end_timesteps: "24"
+    end_timesteps: 48
     deferrable_load_as_semi_cont: false
     deferrable_load_single_constant: false
     minimum_power_deferrable_load: 100
@@ -23,3 +23,4 @@ use_blueprint:
     stop_value: 90
     allow_allways_to_done: true
     deferrable_load_single_constant_work: "False"
+    emhass_config_optimization_time_step: "15"

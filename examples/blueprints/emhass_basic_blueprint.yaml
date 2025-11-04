@@ -18,13 +18,14 @@ use_blueprint:
         {% set future_forecast_watts = namespace(data=[]) %}
         {% for item in combined_forecast %}
           {% if as_datetime(item.period_start) >= now %}
-            {% set pv_estimate_w = (item.pv_estimate | float(0) * 1000) | round(2) %}
-            {% set future_forecast_watts.data = future_forecast_watts.data + [pv_estimate_w] %}
+            {% set pv_estimate_wh = (item.pv_estimate | float(0) * 1000) | round(2) %}
+            {% set pv_power_w = (pv_estimate_wh / 0.5) | round(0) %}
+            {% set future_forecast_watts.data = future_forecast_watts.data + [pv_power_w, pv_power_w] %}
           {% endif %}
         {% endfor %}
-        {{ future_forecast_watts.data[:48] }}
+        {{ future_forecast_watts.data[:96] }}
       {% else %}
-        {{ ([0] * 48) }}
+        {{ ([0] * 96) }}
       {% endif %}
     emhass_config_soc_init: |-
       {%- set min_soc = 5 -%}
@@ -87,3 +88,4 @@ use_blueprint:
     forecast_timer_hours: "5"
     forecast_timer_minutes: "38"
     enable_publish_timer: true
+    emhass_config_optimization_time_step: "15"

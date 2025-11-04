@@ -31,13 +31,13 @@ use_blueprint:
       {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
       float(0) %}
 
-      {% set max_index = 48 %}
+      {% set max_index = 96 %}
 
-      {% set seconds_per_timestep = 30 * 60 %}
+      {% set seconds_per_timestep = 15 * 60 %}
 
       {% set current_dt = now() %}
 
-      {% set min_timesteps_needed = (power_needed / nominal_power_w * 2) |
+      {% set min_timesteps_needed = (power_needed / nominal_power_w * 4) |
       round(0, 'ceil') | int %}
 
       {% set target_times_h_m_s = ["13:00:00", "18:00:00", "05:00:00"] %}
@@ -101,3 +101,4 @@ use_blueprint:
     goe_default_mode_sensor: input_select.wallbox_load_strategy
     goe_power_number_sensor: number.goe_297534_amp
     goe_allow_charging_select: select.goe_297534_frc
+    emhass_config_optimization_time_step: "15"

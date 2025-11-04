@@ -11,8 +11,8 @@
       {% if is_good_day %}
         {{ 0 }}
       {% else %}
-        {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.5 %}
-        {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.5 %}
+        {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.25 %}
+        {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.25 %}
         {% set energy_deficit = consumption_forecast_24h - pv_forecast_24h %}
         {% set min_soc_wh = (min_soc_target_pct / 100 * battery_capacity) %}
         {% set required_soc_wh = max(min_soc_wh, energy_deficit + min_soc_wh) %}
