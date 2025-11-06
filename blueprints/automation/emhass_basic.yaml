@@ -48,6 +48,11 @@ blueprint:
             select:
               options:
                 - "/5"
+                - "/10"
+                - "/15"
+                - "/30"
+                - "/45"
+                - "/60"
         enable_forecast_timer:
           name: Enable ML Forecast Timer (daily)
           description: >
@@ -903,6 +908,11 @@ variables:
   emhass_api_ml: !input emhass_api_ml
 
   # --- EMHASS Variables
+  emhass_publish_minutes_timer_raw: !input publish_minutes_timer
+  emhass_publish_minutes_timer_int: >
+    {% set raw_value = emhass_publish_minutes_timer_raw | default("/5") %}
+    {% set clean_string = raw_value | replace('/', '') %}
+    {{ clean_string | int(default=5) }}
   emhass_config_soc_init_raw: !input emhass_config_soc_init
   emhass_config_soc_init_calc: >
     {% set raw_value = emhass_config_soc_init_raw | string | trim %}
@@ -1142,7 +1152,8 @@ variables:
     {{ values.data }}
   emhass_run_optim: >
     {% set load_list = list_emhass_deferrable_loads %}
-    {% set time_delta = now() - timedelta(minutes=6) %}
+    {% set time_delta_value = emhass_publish_minutes_timer_int + 1 | int %}
+    {% set time_delta = now() - timedelta(minutes=time_delta_value) %}
     {% set values = namespace(data=[]) %}
     {% for entity_id in load_list %}
       {% set start_time = states[entity_id].last_changed %}
