@@ -210,6 +210,7 @@ blueprint:
           selector:
             select:
               options:
+                - "60"
                 - "30"
                 - "15"
         nominal_powers:

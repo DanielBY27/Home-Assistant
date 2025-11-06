@@ -341,6 +341,7 @@ blueprint:
           selector:
             select:
               options:
+                - "60"
                 - "30"
                 - "15"
         emhass_config_historic_days_to_retrieve:
