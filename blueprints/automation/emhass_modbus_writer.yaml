@@ -1,0 +1,177 @@
+blueprint:
+  name: EMHASS Modbus writer
+  description: |
+    This blueprint allows you to write to a Modbus register. However, this requires an entry in the Home Assistant `configuration.yaml` file.
+    Before writing to a Modbus register, read your device manual first!
+    Example:
+    ```
+    modbus:
+      - name: "PLENTICORE10"
+        type: tcp
+        host: xxx.xxx.xxx.xxx
+        port: xxxx
+        sensors:
+          - name: kostal_load_from_gid_modbus
+            slave: 71
+            address: 1034
+            input_type: holding
+            data_type: uint32
+            scan_interval: 20
+    ```
+  domain: automation
+  author: DanielBY27
+  homeassistant:
+    min_version: 2025.10.0
+
+# ------------------------
+# --- Modbus Trigger Input
+# ------------------------
+
+  input:
+
+    # --- EMHASS Config
+    emhass_config:
+      name: EMHASS config
+      description: >
+        Configures the EMHASS options
+      collapsed: true
+      input:
+        input_status:
+          name: Status Helper (Input Select)
+          description: >
+            The `input_select` helper that stores the status of this load. MUST have the options: `done`, `wait`, `running` and `force`.
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                domain: input_select
+
+    # --- Modbus Options
+    modbus_config:
+      name: Modbus config
+      description: >
+        Defines the modbus options to write.
+      collapsed: true
+      input:
+        modbus_config_hub:
+          name: Name of the modbus hub
+          description: >
+            The modbus hub name, its the same name you have used in the `configuration.yaml`.
+          default:
+          selector:
+            text:
+              multiline: false
+        modbus_config_address:
+          name: Address of the modbus register
+          description: >
+            The modbus register, its the same value you have used in the `configuration.yaml`.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 65535
+              step: 1
+              mode: box
+        modbus_config_slave:
+          name: Slave of the modbus register
+          description: >
+            The slave register, its the same value you have used in the `configuration.yaml`.
+          default: 1
+          selector:
+            number:
+              min: 1
+              max: 255
+              step: 1
+              mode: box
+        modbus_config_value:
+          name: Value of the modbus register (JSON)
+          description: |
+            JSON definition to use as value parameter in the modbus register.
+          default: ""
+          selector:
+            text:
+              type: text
+              multiline: true
+        modbus_config_wait:
+          name: Wait write
+          description: >
+            The time in seconds that is waited between write operations to the Modbus register.
+          default: 25
+          selector:
+            number:
+              min: 1
+              max: 59
+              step: 1
+              mode: box
+
+# ----------------------------
+# --- Modbus Trigger Variables
+# ----------------------------
+
+variables:
+
+  tmp_input_status: !input input_status
+  tmp_modbus_config_hub: !input modbus_config_hub
+  tmp_modbus_config_address: !input modbus_config_address
+  tmp_modbus_config_slave: !input modbus_config_slave
+  tmp_modbus_config_value: !input modbus_config_value
+  tmp_modbus_config_wait: !input modbus_config_wait
+
+# ---------------------------
+# --- Modbus Trigger Triggers
+# ---------------------------
+
+triggers:
+
+  - trigger: state
+    entity_id:
+      - !input input_status
+    not_from:
+      - unknown
+      - unavailable
+    to:
+      - running
+  - trigger: homeassistant
+    event: start
+
+# -----------------------------
+# --- Modbus Trigger Conditions
+# -----------------------------
+
+conditions:
+
+  - condition: state
+    entity_id: !input input_status
+    state:
+      - running
+
+# --------------------------
+# --- Modbus Trigger Actions
+# --------------------------
+
+actions:
+
+  - repeat:
+      while:
+        - condition: state
+          entity_id: !input input_status
+          state:
+            - running
+      sequence:
+        - action: modbus.write_register
+          metadata: {}
+          data:
+            hub: "{{ tmp_modbus_config_hub | string }}"
+            address: "{{ tmp_modbus_config_address | int }}"
+            slave: "{{ tmp_modbus_config_slave | int }}"
+            value: "{{ tmp_modbus_config_value | from_json }}"
+        - delay:
+            hours: 0
+            minutes: 0
+            seconds: "{{ tmp_modbus_config_wait | int }}"
+            milliseconds: 0
+
+# ---------------
+# --- Modbus Mode
+# ---------------

@@ -3,29 +3,33 @@
     unique_id: emhass_pv_battery_load_from_grid_in
     unit_of_measurement: %
     state: >
-      {% set is_good_day = is_state('binary_sensor.energy_config_good_day', 'on') %}
       {% set current_soc_pct = states('sensor.scb_battery_soc') | float(0) %}
       {% set battery_capacity = 18000 %}
-      {% set min_soc_target_pct = 20 %}
-      {% set max_soc_target_pct = 60 %}
-      {% if is_good_day %}
+      {% set now_months = now().month %}
+      {% if now_months in [12, 1] %}
+        {% set min_soc_pct = 50 %}
+        {% set max_soc_pct = 70 %}
+      {% elif now_months in [11, 2] %}
+        {% set min_soc_pct = 40 %}
+        {% set max_soc_pct = 60 %}
+      {% else %}
+        {% set min_soc_pct = 20 %}
+        {% set max_soc_pct = 50 %}
+      {% endif %}
+      {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.25 %}
+      {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.25 %}
+      {% set energy_deficit = consumption_forecast_24h - pv_forecast_24h %}
+      {% set min_soc_wh = (min_soc_pct / 100 * battery_capacity) %}
+      {% set required_soc_wh = max(min_soc_wh, energy_deficit + min_soc_wh) %}
+      {% set max_charge_wh = (max_soc_pct / 100 * battery_capacity) %}
+      {% set effective_target_wh = min(required_soc_wh, max_charge_wh) %}
+      {% set calculated_target_pct = (effective_target_wh / battery_capacity) * 100 %}
+      {% set calculated_target_pct_round = ((calculated_target_pct / 5) | round(0, 'ceil') * 5) | int %}
+      {% if current_soc_pct >= calculated_target_pct %}
+        {# ZIEL ERREICHT: Wenn der aktuelle SOC (z.B. 56%) das berechnete Ziel (z.B. 55%) überschreitet, #}
+        {# springt der Sensor auf den Endwert, um die Ladung zu stoppen. #}
         {{ 0 }}
       {% else %}
-        {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.25 %}
-        {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.25 %}
-        {% set energy_deficit = consumption_forecast_24h - pv_forecast_24h %}
-        {% set min_soc_wh = (min_soc_target_pct / 100 * battery_capacity) %}
-        {% set required_soc_wh = max(min_soc_wh, energy_deficit + min_soc_wh) %}
-        {% set max_charge_wh = (max_soc_target_pct / 100 * battery_capacity) %}
-        {% set effective_target_wh = min(required_soc_wh, max_charge_wh) %}
-        {% set calculated_target_pct = (effective_target_wh / battery_capacity) * 100 %}
-        {% set calculated_target_pct_round = ((calculated_target_pct / 5) | round(0, 'ceil') * 5) | int %}
-        {% if current_soc_pct >= calculated_target_pct %}
-          {# ZIEL ERREICHT: Wenn der aktuelle SOC (z.B. 56%) das berechnete Ziel (z.B. 55%) überschreitet, #}
-          {# springt der Sensor auf den Endwert, um die Ladung zu stoppen. #}
-          {{ 0 }}
-        {% else %}
-          {# ZIEL NOCH NICHT ERREICHT: Der Sensor zeigt weiterhin den hohen Zielwert an, um die Ladung zu erzwingen. #}
-          {{ [calculated_target_pct_round, max_soc_target_pct] | min | round(0) }}
-        {% endif %}
+        {# ZIEL NOCH NICHT ERREICHT: Der Sensor zeigt weiterhin den hohen Zielwert an, um die Ladung zu erzwingen. #}
+        {{ [calculated_target_pct_round, max_soc_pct] | min | round(0) }}
       {% endif %}

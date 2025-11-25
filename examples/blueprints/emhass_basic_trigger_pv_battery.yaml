@@ -1,0 +1,47 @@
+alias: PV Battery EMHASS Trigger
+description: ""
+use_blueprint:
+  path: emhass_basic_trigger.yaml
+  input:
+    trigger_strategy: "6"
+    input_status: input_select.pv_battery_emhass_status
+    input_emhass: input_text.pv_battery_emhass_json
+    input_trigger: sensor.p_deferrable5
+    wait_sensor: sensor.emhass_pv_battery_load_from_grid_in
+    wait_value: 30
+    stop_sensor: sensor.emhass_pv_battery_load_from_grid_in
+    stop_value: 25
+    stop_value_overwrite: 10
+    notify_group: parents_mobile_phones
+    operating_hours: >-
+      {% set current_soc_pct = states('sensor.scb_battery_soc') | float(0) %} {%
+      set charge_needed_pct =
+      states('sensor.emhass_pv_battery_load_from_grid_in') | float(0) %} {% set
+      battery_capacity = 18000 %} {% set power_output = 4000 %} {% set
+      step_minutes = 15 %} {% set charge_needed_pct_effective =
+      charge_needed_pct - current_soc_pct %} {% set energy_needed_wh =
+      charge_needed_pct_effective / 100 * battery_capacity %} {% set
+      raw_duration_hours = energy_needed_wh / power_output %} {% set step_hours
+      = step_minutes / 60 %} {% set needed_steps = raw_duration_hours /
+      step_hours %} {% set final_steps = needed_steps | round(0, 'ceil') %} {%
+      set final_duration_hours = final_steps * step_hours %} {{ [0,
+      final_duration_hours] | max | round(2) }}
+    wait_times_hours: "21"
+    wait_times_minutes: "0"
+    update_sensor: number.scb_battery_min_soc
+    nominal_powers: 4000
+    start_timesteps: 0
+    end_timesteps: "32"
+    deferrable_load_as_semi_cont: true
+    deferrable_load_single_constant: false
+    minimum_power_deferrable_load: 4000
+    deferrable_startup_penalty: 4
+    deferrable_load_single_constant_work: >-
+      {% if states('sensor.emhass_pv_battery_load_from_grid_in') | float(0) == 0
+      %}
+        {{ False}}
+      {% else %}
+        {{ True }}
+      {% endif %}
+    allow_allways_to_done: true
+    emhass_config_optimization_time_step: "15"

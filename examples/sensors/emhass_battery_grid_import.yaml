@@ -4,9 +4,18 @@
     unit_of_measurement: W
     device_class: power
     state: >
-      {% set battery_capacity = (states('input_number.energy_config_battery_size_in_kwh') | float(0)) * 1000 %}
-      {% set min_soc_pct = states('input_number.energy_config_battery_load_grid_min_soc') | float(20) %}
-      {% set max_soc_pct = states('input_number.energy_config_battery_load_grid_max_soc') | float(80) %}
+      {% set battery_capacity = 18000 %}
+      {% set now_months = now().month %}
+      {% if now_months in [12, 1] %}
+        {% set min_soc_pct = 50 %}
+        {% set max_soc_pct = 70 %}
+      {% elif now_months in [11, 2] %}
+        {% set min_soc_pct = 40 %}
+        {% set max_soc_pct = 60 %}
+      {% else %}
+        {% set min_soc_pct = 20 %}
+        {% set max_soc_pct = 50 %}
+      {% endif %}
       {% set current_soc_pct = (states('sensor.emhass_battery_init_soc_init') | float(0) * 100) | float(0) %}
       {% set current_soc_wh = (current_soc_pct / 100) * battery_capacity %}
 

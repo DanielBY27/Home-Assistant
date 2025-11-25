@@ -1,0 +1,10 @@
+alias: PV Battery Modbus writer
+description: ""
+use_blueprint:
+  path: emhass_modbus_writer.yaml
+  input:
+    input_status: input_select.pv_battery_emhass_status
+    modbus_config_hub: PLENTICORE10
+    modbus_config_address: 1034
+    modbus_config_slave: 71
+    modbus_config_value: "[0, 50744]"
