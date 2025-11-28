@@ -8,11 +8,16 @@
       {%- set min_power_static = 200 -%}
 
       {%- set fixed_usage_novar_loads = [
-        states('sensor.gefrierschrank_leistung') | int(0),
-        states('sensor.kuhlschrank_leistung') | int(0),
-        states('sensor.tabletmonitor_leistung') | int(0),
-        states('sensor.waschmaschine_leistung') | int(0),
-        states('sensor.tz3000_2putqrmw_ts011f_leistung_2') | int(0)
+        states('sensor.gefrierschrank_leistung') | default(0) | int(0),
+        states('sensor.kuhlschrank_leistung') | default(0) | int(0),
+        states('sensor.tabletmonitor_leistung') | default(0) | int(0),
+        states('sensor.waschmaschine_leistung') | default(0) | int(0),
+        states('sensor.tz3000_2putqrmw_ts011f_leistung_2') | default(0) | int(0),
+        states('sensor.workstation_leistung') | default(0) | int(0),
+        states('sensor.printer_leistung') | default(0) | int(0),
+        states('sensor.lukas_tv_leistung') | default(0) | int(0),
+        states('sensor.lukas_workstation_leistung') | default(0) | int(0),
+        states('sensor.simon_tv_leistung') | default(0) | int(0)
       ] -%}
       {%- set novar_loads_sum = fixed_usage_novar_loads | sum -%}
       {%- set effective_min_power = [min_power_static, novar_loads_sum] | max -%}

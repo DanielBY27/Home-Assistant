@@ -30,4 +30,60 @@ actions:
         - sensor.emhass_go_echarger_trigger
         - sensor.emhass_go_echarger_power
         - sensor.kostal_load_from_gid_modbus
+      entity_globs:
+        - sensor.goe_297534_*
+        - sensor.l201_eea_*
+        - sensor.softliq_*
+        - sensor.epson_et_2850_*
+        - sensor.handy_tanja_xiaomi_13t_*
+        - sensor.redmi_note_9_pro_*
+        - sensor.tanjas_helfer_*
+        - sensor.speedport_*
+        - sensor.vr3ezzkxzpj688123_*
+        - sensor.tibber27a_*
+        - sensor.gefrierschrank_*
+        - sensor.geschirrspuler_*
+        - sensor.kuhlschrank_*
+        - sensor.tabletmonitor_*
+        - sensor.tz3000_2putqrmw_ts011f_*
+        - sensor.waschmaschine_*
+        - sensor.waschmaschine_*
+        - sensor.workstation_*
+        - sensor.printer_*
+        - sensor.kaffeemaschine_*
+        - sensor.mikrowelle_*
+        - sensor.lukas_tv_*
+        - sensor.lukas_workstation_*
+        - sensor.simon_tv_*
+  - action: recorder.purge_entities
+    metadata: {}
+    data:
+      keep_days: 10
+      entity_globs:
+        - sensor.solcast_pv_forecast_*
+        - sensor.scb_ac_*
+        - sensor.scb_autarky_*
+        - sensor.scb_battery*
+        - sensor.scb_dc1_*
+        - sensor.scb_dc2_*
+        - sensor.scb_energy_*
+        - sensor.scb_grid_*
+        - sensor.scb_home_*
+        - sensor.scb_inverter_*
+        - sensor.scb_own_*
+        - sensor.scb_pv_to_*
+        - sensor.scb_sum_power_*
+  - if:
+      - condition: template
+        value_template: >-
+          {% set quarter_start_months = [1, 4, 7, 10] %}
+
+          {{ now().month in quarter_start_months and now().isoweekday() == 1 and
+          now().day <= 7 }}
+    then:
+      - action: recorder.purge
+        data:
+          repack: true
+          apply_filter: true
+          keep_days: 70
 mode: single
