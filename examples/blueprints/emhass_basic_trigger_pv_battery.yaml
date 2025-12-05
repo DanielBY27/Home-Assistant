@@ -45,3 +45,4 @@ use_blueprint:
       {% endif %}
     allow_allways_to_done: true
     emhass_config_optimization_time_step: "15"
+    automation_logger_level: INFO

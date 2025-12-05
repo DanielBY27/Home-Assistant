@@ -5,7 +5,7 @@
     device_class: power
     state: >
       {%- set total_power = states('sensor.scb_home_power') | float(0) -%}
-      {%- set min_power_static = 200 -%}
+      {%- set min_power_static = 50 -%}
 
       {%- set fixed_usage_novar_loads = [
         states('sensor.gefrierschrank_leistung') | default(0) | int(0),
@@ -23,11 +23,11 @@
       {%- set effective_min_power = [min_power_static, novar_loads_sum] | max -%}
 
       {%- set fixed_usage_var_loads = [
-        states('sensor.geschirrspuler_leistung') | int(0),
-        states('sensor.tz3000_2putqrmw_ts011f_leistung') | int(0),
-        states('sensor.waschmaschine_leistung_2') | int(0),
-        states('sensor.p_deferrable3') | int(0),
-        states('sensor.goe_297534_nrg_11') | int(0)
+        states('sensor.geschirrspuler_leistung') | default(0) | int(0),
+        states('sensor.tz3000_2putqrmw_ts011f_leistung') | default(0) | int(0),
+        states('sensor.waschmaschine_leistung_2') | default(0) | int(0),
+        states('sensor.p_deferrable3') | default(0) | int(0),
+        states('sensor.goe_297534_nrg_11') | default(0) | int(0)
       ] -%}
       {%- set var_loads_sum = fixed_usage_var_loads | sum -%}
       {%- set calculated_base_load = total_power - var_loads_sum -%}

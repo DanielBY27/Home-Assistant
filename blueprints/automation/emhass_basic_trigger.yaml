@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller
+  name: EMHASS Deferrable Load Controller (v202512)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -22,6 +22,7 @@ blueprint:
     **Setup:**
     After configuring this automation, you **must** add the `input_text` helper you created to the "List of EMHASS Deferrable Loads" input in your main `EMHASS Basic Automation`.
   domain: automation
+  source_url: https://github.com/DanielBY27/Home-Assistant/blob/main/blueprints/automation/emhass_basic_trigger.yaml
   author: DanielBY27
   homeassistant:
     min_version: 2025.10.0
@@ -251,6 +252,19 @@ blueprint:
           selector:
             text:
               multiline: true
+        end_timesteps_force_run:
+          name: Additional End Timestamps by a force run (optional)
+          description: >
+            If automation is started via the `force` option, additional end times can be added here. This increases the operating hours (ho). By an force run the
+            start timestamp is `0` and the endtimesampt (et) is calculated over the operating hours and this timestamps. This can be useful if an electric car takes
+            longer to charge but absolutely must be fully charged.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 96
+              step: 1
+              mode: box
         deferrable_load_as_semi_cont:
           name: Semi-Continuous Load / Power Modulation (se)
           description: |
@@ -302,9 +316,9 @@ blueprint:
               step: 1
               mode: box
 
-    # --- EMHASS Notify
+    # --- EMHASS Notify & Logging
     grid_basic_notify_config:
-      name: Notifications
+      name: Notifications & Logging
       description: >
         (Optional) Sends notifications when the load's status changes.
       collapsed: true
@@ -341,23 +355,47 @@ blueprint:
           selector:
             text:
               type: text
+        automation_trace_count:
+          name: Number of traces
+          description: >
+            Number of traces to be saved by this automation
+          default: 10
+          selector:
+            number:
+              min: 5
+              max: 90
+              step: 1
+              mode: box
+        automation_logger_level:
+          name: Automation logger level
+          description: >
+            The logging level for this automation.
+          default: INFO
+          selector:
+            select:
+              options:
+                - label: DEBUG
+                  value: DEBUG
+                - label: WARNING
+                  value: WARNING
+                - label: INFO
+                  value: INFO
 
 # ----------------------------
 # --- EMHASS Trigger Variables
 # ----------------------------
 
 variables:
-
+  blueprint_version: v202512
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
+  input_automation_logger_level: !input automation_logger_level
+  input_automation_trace_count: !input automation_trace_count
   emhass_step: !input emhass_config_optimization_time_step
   input_allow_allways_to_done: !input allow_allways_to_done
   input_trigger_strategy: !input trigger_strategy
   input_trigger_sensor: !input input_trigger
-  input_trigger_sensor_str: "{{ input_trigger_sensor | string }}"
   input_update_sensor: !input update_sensor
-  input_update_sensor_str: "{{ input_update_sensor | string | lower }}"
   input_status_sensor: !input input_status
-  input_status_sensor_str: "{{ input_status_sensor | string }}"
   input_notify_group: !input notify_group
   input_notify_wait: !input notify_wait
   input_notify_running: !input notify_running
@@ -365,57 +403,126 @@ variables:
   input_wait_sensor: !input wait_sensor
   input_wait_value: !input wait_value
   input_skipp_wait_to_force: !input skipp_wait_to_force
-  input_wait_sensor_str: "{{ input_wait_sensor | string }}"
   input_wait_times_hours: !input wait_times_hours
   input_wait_times_minutes: !input wait_times_minutes
   input_stop_sensor: !input stop_sensor
   input_stop_value: !input stop_value
   input_stop_value_overwrite: !input stop_value_overwrite
-  input_stop_sensor_str: "{{ input_stop_sensor | string }}"
   input_emhass_sensor: !input input_emhass
   input_po: !input nominal_powers
   input_st: !input start_timesteps
   input_se: !input deferrable_load_as_semi_cont
   input_si: !input deferrable_load_single_constant
-  input_si_work_raw: !input deferrable_load_single_constant_work
-  input_si_work: >
-    {% set raw_value = input_si_work_raw | string | trim %}
-    {% if '{{' in raw_value and '}}' in raw_value %}
-      {{ raw_value }}
-    {% else %}
-      {{ raw_value | bool }}
-    {% endif %}
+  input_si_work: !input deferrable_load_single_constant_work
   input_mp: !input minimum_power_deferrable_load
   input_pe: !input deferrable_startup_penalty
-  input_ho_raw: !input operating_hours
-  input_ho: >
-    {% set raw_value = input_ho_raw | string | trim %}
-    {% if '{{' in raw_value and '}}' in raw_value %}
-      {{ raw_value }}
-    {% else %}
-      {{ raw_value | float(1 / (60 / (emhass_step | float(30)))) }}
-    {% endif %}
-  end_timesteps_raw: !input end_timesteps
-  end_timesteps: >
-    {% set raw_value = end_timesteps_raw | string | trim %}
-    {% if '{{' in raw_value and '}}' in raw_value %}
-      {{ raw_value }}
-    {% else %}
-      {{ raw_value | int(input_st + 1 | int(12)) }}
-    {% endif %}
-  payload_emhass_settings: >-
-    {% set payload = {
-      "po": input_po | int(0),
-      "ho": input_ho | float(0),
-      "st": input_st | int(0) | round(0),
-      "et": end_timesteps | int(0) | round(0),
-      "se": input_se | bool,
-      "si": input_si | bool,
-      "mp": input_mp | int(0),
-      "pe": input_pe | int(0),
-      "us": "unknown"
+  input_ho: !input operating_hours
+  input_end_timesteps: !input end_timesteps
+  input_end_timesteps_force_run: !input end_timesteps_force_run
+
+  # Read in all currently available values and save it read-only in this variable
+  snapshot: >
+    {% set status_json = states(input_emhass_sensor | string) | from_json(default={}) %}
+    {% set now_dt = now() %}
+    {% set snapshot_base = {
+      "current_time": now_dt | as_datetime | as_local | string,
+      "automation_logger_level": input_automation_logger_level | default('info') | string | lower,
+      "automation_po": input_po | int,
+      "automation_ho": input_ho | float(0),
+      "automation_st": input_st | default (0) | int,
+      "automation_et": input_end_timesteps | default(0) | int,
+      "automation_se": input_se | default(false) | bool,
+      "automation_si": input_si | default(true) | bool,
+      "automation_si_work": input_si_work | default(true) | bool,
+      "automation_mp": input_mp | default(1) | int,
+      "automation_pe": input_pe | default(0) | int,
+      "automation_et_force": input_end_timesteps_force_run | default(0) | int,
+      "allow_allways_to_done_value": input_allow_allways_to_done | default(false) | bool,
+      "trigger_strategy_value": input_trigger_strategy | default("1") | string,
+      "trigger_sensor_name": input_trigger_sensor | string,
+      "trigger_sensor_value": states(input_trigger_sensor | string) | default(0) | int,
+      "trigger_sensor_attribute_name": (input_trigger_sensor | string).split('.')[-1],
+      "update_sensor_name": input_update_sensor | string,
+      "update_sensor_type": (input_update_sensor | string).split('.')[0],
+      "status_sensor_name": input_status_sensor | string,
+      "status_sensor_value": states(input_status_sensor | string) | default('done') | string,
+      "status_sensor_changed": states[(input_status_sensor | string)].last_changed | as_datetime | as_local | string,
+      "status_sensor_changed_by_user": (states.person | selectattr('attributes.user_id', 'eq', states[(input_status_sensor | string)].context.user_id) | list) | length > 0,
+      "status_json_sensor_name": input_emhass_sensor | string,
+      "status_json_sensor_value": status_json | string,
+      "status_json_sensor_changed": states[(input_emhass_sensor | string)].last_changed | as_datetime | as_local | string,
+      "status_json_sensor_changed_by_user": (states.person | selectattr('attributes.user_id', 'eq', states[(input_emhass_sensor | string)].context.user_id) | list) | length > 0,
+      "notify_group_name": input_notify_group | default('') | string,
+      "notify_wait_message": input_notify_wait | default('') | string,
+      "notify_running_message": input_notify_running | default('') | string,
+      "notify_done_message": input_notify_done | default('') | string,
+      "wait_sensor_name": input_wait_sensor | string,
+      "wait_sensor_value": states(input_wait_sensor | string) | default(0) | float,
+      "wait_sensor_threshold": input_wait_value | default(1) | int,
+      "skipp_wait_to_force_value": input_skipp_wait_to_force | default(false) | bool,
+      "wait_times_hours_value": input_wait_times_hours | default('0') | string,
+      "wait_times_minutes_value": input_wait_times_minutes | default('5') | string,
+      "stop_sensor_name": input_stop_sensor | string,
+      "stop_sensor_value": states(input_stop_sensor | string) | default(0) | float,
+      "stop_sensor_overwrite_value": input_stop_value_overwrite | default(-1) | int,
+      "stop_sensor_threshold": input_stop_value | default(1) | int,
+      "emhass_step_value": emhass_step | default(30) | int,
+      "emhass_step_value_hour": (1 / (60 / (emhass_step | default(30) | int))) | default(0.5) | float,
+      "emhass_current_time_delta": (now_dt - timedelta(minutes=(emhass_step | default(30) | int))) | as_datetime | as_local | string,
+      "emhass_po": status_json['po'] | default(1) | int,
+      "emhass_ho": status_json['ho'] | default(0) | float,
+      "emhass_st": status_json['st'] | default(0) | int,
+      "emhass_et": status_json['et'] | default(0) | int,
+      "emhass_se": status_json['se'] | default(false) | bool,
+      "emhass_si": status_json['si'] | default(true) | bool,
+      "emhass_mp": status_json['mp'] | default(1) | int,
+      "emhass_pe": status_json['pe'] | default(0) | int,
+      "emhass_us": status_json['us'] | default('done') | string,
+      "emhass_ss": status_json['ss'] | default(0) | int
     } %}
-    {{ payload | to_json }}
+    {% set ns = namespace(count=0, count_done=0, count_open=0, power=0, power_done=0, power_done_min=0,
+        power_done_max=0, power_open=0, power_open_min=0, power_open_max=0)
+    %}
+    {% for item in (state_attr(snapshot_base.trigger_sensor_name, 'deferrables_schedule') | default([])) %}
+      {% set p = item[snapshot_base.trigger_sensor_attribute_name] | float(0) %}
+      {% set d = item.date | as_datetime %}
+      {% set ns.count = ns.count + 1 %}
+      {% set ns.power = ns.power + p %}
+      {% if d >= (now_dt - timedelta(minutes=(snapshot_base.emhass_step_value | default(30) | int))) %}
+        {% set ns.count_open = ns.count_open + 1 %}
+        {% set ns.power_open = ns.power_open + p %}
+        {% if p > 0 %}
+          {% if ns.power_open_min <= 0 %}
+            {% set ns.power_open_min = p %}
+          {% else %}
+            {% set ns.power_open_min = [ns.power_open_min, p] | min %}
+          {% endif %}
+          {% set ns.power_open_max = [ns.power_open_max, p] | max %}
+        {% endif %}
+      {% else %}
+        {% if ns.power_done_min <= 0 %}
+          {% set ns.power_done_min = p %}
+        {% else %}
+          {% set ns.power_done_min = [ns.power_done_min, p] | min %}
+        {% endif %}
+        {% set ns.power_done_max = [ns.power_done_max, p] | max %}
+        {% set ns.count_done = ns.count_done + 1 %}
+        {% set ns.power_done = ns.power_done + p %}
+      {% endif %}
+    {% endfor %}
+    {% set def = {
+      "emhass_deferrable_count": ns.count,
+      "emhass_deferrable_count_done": ns.count_done,
+      "emhass_deferrable_count_open": ns.count_open,
+      "emhass_deferrable_power": ns.power,
+      "emhass_deferrable_power_done": ns.power_done,
+      "emhass_deferrable_power_done_min": ns.power_done_min,
+      "emhass_deferrable_power_done_max": ns.power_done_max,
+      "emhass_deferrable_power_open": ns.power_open,
+      "emhass_deferrable_power_open_min": ns.power_open_min,
+      "emhass_deferrable_power_open_max": ns.power_open_max
+    } %}
+    {{ (snapshot_base | combine(def)) | to_json }}
 
 # ---------------------------
 # --- EMHASS Trigger Triggers
@@ -423,51 +530,46 @@ variables:
 
 triggers:
 
-  # --- Wait Trigger
   - trigger: numeric_state
     entity_id:
       - !input wait_sensor
     above: !input wait_value
-    id: wait
-  - trigger: time_pattern
-    hours: !input wait_times_hours
-    minutes: !input wait_times_minutes
-    seconds: 3
-    id: wait_cron
-  # --- Force Trigger
-  - trigger: state
-    entity_id:
-      - !input input_status
-    not_from:
-    - unknown
-    - unavailable
-    to: force
-    id: force
-  # --- Running Trigger
-  - trigger: state
-    entity_id:
-      - !input input_status
-    not_from:
-    - unknown
-    - unavailable
-    to: running
-    id: running
+    for: "00:00:05"
+    id: wait_sensor_value_above
   - trigger: numeric_state
     entity_id:
       - !input input_trigger
     above: 0
-    id: running_emhass
-  # --- Done Trigger
+    for: "00:00:05"
+    id: input_sensor_value_above
   - trigger: numeric_state
     entity_id:
       - !input stop_sensor
     below: !input stop_value
-    id: done
+    for: "00:00:05"
+    id: stop_sensor_value_above
   - trigger: numeric_state
     entity_id:
       - !input input_trigger
     below: 1
-    id: done_emhass
+    for: "00:00:05"
+    id: input_sensor_value_below
+  - trigger: state
+    entity_id:
+      - !input input_status
+    not_to:
+      - unknown
+      - unavailable
+    not_from:
+      - unknown
+      - unavailable
+    for: "00:00:05"
+    id: input_state_changed
+  - trigger: time_pattern
+    hours: !input wait_times_hours
+    minutes: !input wait_times_minutes
+    seconds: 3
+    id: cron
 
 # -----------------------------
 # --- EMHASS Trigger Conditions
@@ -475,80 +577,13 @@ triggers:
 
 conditions:
 
-  - condition: or
-    conditions:
-
-      # --- EMHASS Trigger Condition wait
-      - condition: and
-        conditions:
-          - condition: trigger
-            id:
-              - wait
-              - wait_cron
-          - condition: state
-            entity_id: !input input_status
-            state: done
-          - condition: numeric_state
-            entity_id: !input wait_sensor
-            above: !input wait_value
-          - condition: template
-            value_template: "{{ input_ho >= (1 / (60 / (emhass_step | float(30)))) }}"
-          - condition: template
-            value_template: "{{ input_po >= 100 }}"
-          - condition: or
-            conditions:
-              - condition: and
-                conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['1', '3', '5'] }}"
-                  - condition: trigger
-                    id: wait
-              - condition: and
-                conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['2', '4', '6'] }}"
-                  - condition: trigger
-                    id: wait_cron
-
-      # --- EMHASS Trigger Condition running
-      - condition: and
-        conditions:
-          - condition: trigger
-            id:
-              - running
-              - running_emhass
-              - force
-          - condition: template
-            value_template: "{{ states(input_status_sensor_str) | string in ['done', 'wait', 'force'] }}"
-
-      # --- EMHASS Trigger Condition done
-      - condition: and
-        conditions:
-          - condition: trigger
-            id:
-              - done
-              - done_emhass
-          - condition: or
-            conditions:
-              - condition: state
-                entity_id: !input input_status
-                state: running
-              - condition: template
-                value_template: "{{ input_allow_allways_to_done | bool }}"
-          - condition: or
-            conditions:
-              - condition: and
-                conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['1', '2', '5', '6'] }}"
-                  - condition: trigger
-                    id: done
-              - condition: and
-                conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['3', '4', '5', '6'] }}"
-                  - condition: trigger
-                    id: done_emhass
+  - condition: template
+    value_template: >
+      {{
+        has_value((snapshot | from_json).status_sensor_name) and
+        has_value((snapshot | from_json).status_json_sensor_name) and
+        has_value((snapshot | from_json).trigger_sensor_name)
+      }}
 
 # --------------------------
 # --- EMHASS Trigger Actions
@@ -556,327 +591,427 @@ conditions:
 
 actions:
 
-  # --- Run EMHASS wait ---
-  - alias: Run trigger wait
+   # --- Create output variable
+  - variables:
+      context: >
+        {% set config = snapshot | from_json %}
+        {% set automation_trigger_id = trigger.id | default('none') | string | lower %}
+
+        {# --- User Action Detection --- #}
+        {% set is_user_action = config.status_sensor_changed_by_user == true and
+          as_timestamp(config.current_time) - as_timestamp(config.status_sensor_changed) < 10 %}
+
+        {# --- Initialize Result Namespace --- #}
+        {% set res = namespace(action_needed = false, sensor_value_number = 0,
+          sensor_value_switch = 'off', target_status = 'none',
+          new_po = config.automation_po, new_ho = config.automation_ho,
+          new_st = config.automation_st, new_et = config.automation_et,
+          new_se = config.automation_se, new_si = config.automation_si,
+          new_mp = config.automation_mp, new_pe = config.automation_pe,
+          new_us = 'none', new_ss = config.emhass_ss,
+          notify_enabled = false, notify_message = '',
+          automation_action = 'none', log_msg = [])
+        %}
+
+        {# --- New State Maschine --- #}
+        {% if is_user_action == true %}
+          {% if config.status_sensor_value == 'wait' %}
+            {% set res.log_msg = res.log_msg + ['User switched to state wait'] %}
+            {% set res.automation_action = 'wait' %}
+          {% elif config.status_sensor_value == 'running' %}
+            {% set res.log_msg = res.log_msg + ['User switched to state running'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-')) %}
+            {% set res.log_msg = res.log_msg + ['User switched to state force'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif config.status_sensor_value == 'done' %}
+            {% set res.log_msg = res.log_msg + ['User switched to state done'] %}
+            {% set res.automation_action = 'done' %}
+          {% else %}
+            {% set res.log_msg = res.log_msg + ['User switched to unknow state: ' ~ config.status_sensor_value] %}
+          {% endif %}
+        {% else %}
+          {% if automation_trigger_id == 'input_state_changed' %}
+            {% set res.log_msg = res.log_msg + ['Trigger id input_state_changed are not allowed (only for user action)'] %}
+          {% else %}
+            {% if
+                config.wait_sensor_value > config.wait_sensor_threshold and
+                config.emhass_us == 'done' and
+                config.automation_ho >= config.emhass_step_value_hour and
+                config.trigger_strategy_value in ['1', '3', '5']
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1000)'] %}
+              {% set res.automation_action = 'wait' %}
+            {% elif
+                automation_trigger_id == 'cron' and
+                config.emhass_us == 'done' and
+                config.automation_ho >= config.emhass_step_value_hour and
+                config.trigger_strategy_value in ['2', '4', '6']
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1010)'] %}
+              {% set res.automation_action = 'wait' %}
+            {% elif
+                config.emhass_us in ['running', 'wait'] and
+                config.emhass_deferrable_power_open > 0 and
+                config.trigger_sensor_value == 0 and
+                config.automation_si == false and
+                config.automation_si_work == true
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1020)'] %}
+              {% set res.automation_action = 'wait' %}
+            {% elif
+              (config.emhass_us == 'force' or ((config.emhass_us).startswith('force-'))) and
+              config.stop_sensor_value >= config.stop_sensor_threshold and
+              (
+                (config.status_sensor_value in ['wait', 'running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+                config.trigger_sensor_value > 0
+              )
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state force running by emhass sensor (1100)'] %}
+              {% set res.automation_action = 'running' %}
+            {% elif
+              config.emhass_us == 'wait' and
+              (
+                (
+                  config.stop_sensor_value >= config.stop_sensor_threshold and
+                  config.status_sensor_value == 'wait'
+                ) or (
+                  config.trigger_sensor_value > 0
+                )
+              )
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1110)'] %}
+              {% set res.automation_action = 'running' %}
+            {% elif
+              (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
+              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) and
+              config.wait_sensor_value > config.wait_sensor_threshold and
+              config.trigger_sensor_value > 0
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1120)'] %}
+              {% set res.automation_action = 'running' %}
+            {% elif
+              config.stop_sensor_value < config.stop_sensor_threshold and
+              config.trigger_strategy_value in ['1', '2', '5', '6'] and
+              (
+                (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+                config.allow_allways_to_done_value == true
+              )
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state done by stop sensor (1200)'] %}
+              {% set res.automation_action = 'done' %}
+            {% elif
+              config.trigger_sensor_value == 0 and
+              config.trigger_strategy_value in ['3', '4', '5', '6'] and
+              (
+                (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+                config.allow_allways_to_done_value == true
+              )
+            %}
+              {% set res.log_msg = res.log_msg + ['Automation switched to state done by emhass sensor (1210)'] %}
+              {% set res.automation_action = 'done' %}
+            {% else %}
+              {% set res.log_msg = res.log_msg + ['Can not switch to new state. No state found. (1300)'] %}
+            {% endif %}
+          {% endif %}
+        {% endif %}
+
+        {# --- Got to wait --- #}
+        {% if res.automation_action == 'wait' %}
+          {% set res.log_msg = res.log_msg + ['Go to status wait'] %}
+          {% set res.new_us = 'wait' if config.skipp_wait_to_force_value == false else 'force' %}
+          {% set res.target_status = res.new_us %}
+          {% set res.notify_enabled = config.notify_wait_message is not none and config.notify_wait_message != '' %}
+          {% set res.notify_message = config.notify_wait_message %}
+          {% set res.new_ss = config.emhass_ss if config.emhass_ss > 0 else as_timestamp(config.current_time) | int %}
+
+        {# --- Got to running (force) --- #}
+        {% elif res.automation_action == 'running' %}
+          {% set res.log_msg = res.log_msg + ['Go to status running'] %}
+          {% if
+              (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
+              (
+                config.emhass_us == config.status_sensor_value or
+                config.emhass_si == true
+              )
+          %}
+            {% set res.log_msg = res.log_msg + ['The status is already in a running state: ' + config.emhass_us] %}
+          {% else %}
+            {% set res.notify_enabled = config.notify_running_message is not none and config.notify_running_message != '' %}
+            {% set res.notify_message = config.notify_running_message %}
+            {% set res.new_ss = config.emhass_ss if config.emhass_ss > 0 else as_timestamp(config.current_time) | int %}
+            {% if (config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-'))) %}
+              {% set res.log_msg = res.log_msg + ['Set force running options'] %}
+              {% set res.new_us = config.status_sensor_value %}
+              {% set res.target_status = res.new_us %}
+              {% set res.new_si = true %}
+              {% set res.new_se = false %}
+              {% set res.new_st = 0 %}
+              {% set res.new_ho = config.automation_ho + ((config.automation_et_force * config.emhass_step_value) / 60) %}
+              {% set res.new_et = (res.new_ho / config.emhass_step_value_hour) | int %}
+            {% else %}
+              {% set res.log_msg = res.log_msg + ['Set running options'] %}
+              {% set res.new_us = 'running' %}
+              {% set res.target_status = res.new_us %}
+            {% endif %}
+            {% if config.update_sensor_type in ['number', 'input_number'] %}
+              {% set res.sensor_value_number = config.wait_sensor_value %}
+            {% else %}
+              {% set res.sensor_value_switch = 'on' %}
+            {% endif %}
+          {% endif %}
+
+        {# --- Got to done --- #}
+        {% elif res.automation_action == 'done' %}
+          {% set res.log_msg = res.log_msg + ['Go to status done'] %}
+          {% set res.new_us = 'done' %}
+          {% set res.target_status = res.new_us %}
+          {% set res.notify_enabled = config.notify_done_message is not none and config.notify_done_message != '' %}
+          {% set res.notify_message = config.notify_done_message %}
+          {% set res.new_ss = 0 %}
+          {% set res.new_ho = 0 %}
+          {% if config.update_sensor_type in ['number', 'input_number'] %}
+            {% set res.sensor_value_number = config.stop_sensor_value if config.stop_sensor_overwrite_value == -1 else config.stop_sensor_overwrite_value %}
+          {% else %}
+            {% if config.trigger_strategy_value in ['3', '4', '5', '6'] %}
+              {% set res.sensor_value_switch = 'off' %}
+            {% else %}
+              {% set res.sensor_value_switch = 'on' %}
+            {% endif %}
+          {% endif %}
+
+        {# --- State change are not allowed --- #}
+        {% else %}
+          {% set res.log_msg = res.log_msg + ['No state found. (1310)'] %}
+        {% endif %}
+
+        {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
+        {# --- A new calculation can only be generated via the status 'done' -> 'wait' --- #}
+        {% set result_target_json = {
+            'po': res.new_po if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_po,
+            'ho': res.new_ho if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_ho,
+            'st': res.new_st if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_st,
+            'et': res.new_et if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_et,
+            'se': res.new_se if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_se,
+            'si': res.new_si if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_si,
+            'mp': res.new_mp if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_mp,
+            'pe': res.new_pe if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_pe,
+            'us': res.new_us,
+            'ss': res.new_ss
+          }
+        %}
+
+        {# --- Action are needed --- #}
+        {% if res.new_us == 'none' %}
+          {% set res.action_needed = false %}
+        {% else %}
+          {% set res.action_needed = config.status_json_sensor_value != (result_target_json | string) %}
+        {% endif %}
+
+        {{ {
+          'automation': {
+            'trigger_id': automation_trigger_id,
+            'logger_level': config.automation_logger_level,
+            'is_user_action': is_user_action
+          },
+          'source_json': {
+            'po': config.emhass_po,
+            'ho': config.emhass_ho,
+            'st': config.emhass_st,
+            'et': config.emhass_et,
+            'se': config.emhass_se,
+            'si': config.emhass_si,
+            'mp': config.emhass_mp,
+            'pe': config.emhass_pe,
+            'us': config.emhass_us,
+            'ss': config.emhass_ss
+          },
+          'result': {
+            'action_needed': res.action_needed,
+            'target_status': res.target_status,
+            'target_json': result_target_json,
+            'sensor': {
+              'type': config.update_sensor_type,
+              'name': config.update_sensor_name,
+              'value_number': res.sensor_value_number,
+              'value_switch': res.sensor_value_switch
+            },
+            'notify': {
+              'enabled': res.notify_enabled,
+              'group': config.notify_group_name,
+              'message': res.notify_message
+            }
+          },
+          'logs': res.log_msg
+        } | to_json }}
+
+  # --- Run EMHASS Actions
+  - alias: Logging
+    parallel:
+    - alias: Info logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level == 'info' }}
+      then:
+        - service: system_log.write
+          data:
+            level: info
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [INFO]:
+              result data: {{ (context | from_json).result }}
+              logs: {{ (context | from_json).logs }}
+    - alias: Warning logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level in ['debug', 'warning'] }}
+      then:
+        - service: system_log.write
+          data:
+            level: warning
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [WARNING]:
+              result data: {{ (context | from_json).result }}
+              logs: {{ (context | from_json).logs }}
+    - alias: Debug logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level == 'debug' }}
+      then:
+        - service: system_log.write
+          data:
+            level: warning
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [DEBUG]:
+              snapshot: {{ snapshot }}
+              context: {{ context | from_json }}
+
+  - alias: Update EMHASS Trigger fields
     if:
-      - condition: trigger
-        id:
-          - wait
-          - wait_cron
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {{ config.result.action_needed | default(true) | bool }}
     then:
-      - alias: If Switch or input_boolen then power off
-        choose:
-          - conditions:
+      - alias: Set trigger options in parallel mode
+        parallel:
+        - alias: Set trigger sensor switch to off
+          if:
             - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('switch.') }}"
-            sequence:
-              - action: switch.turn_off
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'switch' and config.result.sensor.value_switch == 'off' }}
+          then:
+            - action: switch.turn_off
+              target:
+                entity_id: !input update_sensor
+        - alias: Set trigger sensor input_boolean to off
+          if:
             - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('input_boolean.') }}"
-            sequence:
-              - action: input_boolean.turn_off
-                target:
-                  entity_id: !input update_sensor
-      - action: input_select.select_option
-        data:
-          option: wait
-        target:
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'input_boolean' and config.result.sensor.value_switch == 'off' }}
+          then:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: !input update_sensor
+        - alias: Set trigger sensor switch to on
+          if:
+            - condition: template
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'switch' and config.result.sensor.value_switch == 'on' }}
+          then:
+            - action: switch.turn_on
+              target:
+                entity_id: !input update_sensor
+        - alias: Set trigger sensor input_boolean to on
+          if:
+            - condition: template
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'input_boolean' and config.result.sensor.value_switch == 'on' }}
+          then:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: !input update_sensor
+        - alias: Set trigger sensor number to value
+          if:
+            - condition: template
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'number' and config.result.target_status != 'wait' }}
+          then:
+            - action: number.set_value
+              data:
+                value: >
+                  {% set config = context | from_json %}
+                  {{ config.result.sensor.value_number | default(0) | float }}
+              target:
+                entity_id: !input update_sensor
+        - alias: Set trigger sensor input_number to value
+          if:
+            - condition: template
+              value_template: >
+                {% set config = context | from_json %}
+                {{ config.result.sensor.type == 'input_number' and config.result.target_status != 'wait' }}
+          then:
+            - action: input_number.set_value
+              data:
+                value: >
+                  {% set config = context | from_json %}
+                  {{ config.result.sensor.value_number | default(0) | float }}
+              target:
+                entity_id: !input update_sensor
+
+      - alias: Set Trigger status and json in parallel mode
+        parallel:
+        - alias: Update Trigger status
+          action: input_select.select_option
+          data:
+            option: >
+              {% set config = context | from_json %}
+              {{ config.result.target_status | default(done) | string }}
+          target:
             entity_id: !input input_status
-      - if:
-          - condition: template
-            value_template: "{{ input_skipp_wait_to_force == true }}"
-        then:
-          - action: input_select.select_option
-            data:
-              option: force
-            target:
-                entity_id: !input input_status
-      # --- Run Notify
-      - if:
-          - condition: template
-            value_template: "{{ input_notify_wait is not none and input_notify_wait | trim != '' }}"
-        then:
-          - alias: Send Message
-            action: "notify.{{ input_notify_group }}"
-            data:
-              message: "{{ input_notify_wait }}"
+        - alias: Update EMHASS settings
+          action: input_text.set_value
+          data:
+            value: >
+              {% set config = context | from_json %}
+              {{ config.result.target_json | to_json }}
+          target:
+            entity_id: !input input_emhass
 
-  # --- Run EMHASS running ---
-  - alias: Run trigger running
-    if:
-      - condition: trigger
-        id:
-          - running
-          - running_emhass
-          - force
-    then:
-      - alias: If Switch or input_boolen then power on by Number or input_number set value from wait_sensor
-        choose:
-          - conditions:
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('switch.') }}"
-            sequence:
-              - action: switch.turn_on
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('input_boolean.') }}"
-            sequence:
-              - action: input_boolean.turn_on
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('number.') }}"
-            sequence:
-              - action: number.set_value
-                data:
-                  value: "{{ states(input_wait_sensor_str) | float | round(0) }}"
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('input_number.') }}"
-            sequence:
-              - action: input_number.set_value
-                data:
-                  value: "{{ states(input_wait_sensor_str) | float | round(0) }}"
-                target:
-                  entity_id: !input update_sensor
-      - action: input_select.select_option
-        data:
-          option: running
-        target:
-            entity_id: !input input_status
-
-      # --- Run Notify
-      - if:
-          - condition: template
-            value_template: "{{ input_notify_running is not none and input_notify_running | trim != '' }}"
-        then:
-          - alias: Send Message
-            action: "notify.{{ input_notify_group }}"
-            data:
-              message: "{{ input_notify_running }}"
-
-  # --- Run EMHASS done
-  - alias: Run trigger done
-    if:
-      - condition: trigger
-        id:
-          - done
-          - done_emhass
-    then:
-      - alias: Power off by trigger strategy
-        choose:
-          # --- Ensure that the strategy is followed and the devices are switched off
-          - conditions:
-            - condition: or
-              conditions:
-                - condition: and
-                  conditions:
-                    - condition: template
-                      value_template: "{{ input_trigger_strategy | string in ['3', '4'] }}"
-                    - condition: template
-                      value_template: "{{ trigger.id == 'done_emhass' }}"
-                    - condition: template
-                      value_template: "{{ input_update_sensor_str.startswith('switch.') }}"
-                - condition: and
-                  conditions:
-                    - condition: template
-                      value_template: "{{ input_trigger_strategy | string in ['5', '6'] }}"
-                    - condition: template
-                      value_template: "{{ input_update_sensor_str.startswith('switch.') }}"
-            sequence:
-              - action: switch.turn_off
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: or
-              conditions:
-                - condition: and
-                  conditions:
-                    - condition: template
-                      value_template: "{{ input_trigger_strategy | string in ['3', '4'] }}"
-                    - condition: template
-                      value_template: "{{ trigger.id == 'done_emhass' }}"
-                    - condition: template
-                      value_template: "{{ input_update_sensor_str.startswith('input_boolean.') }}"
-                - condition: and
-                  conditions:
-                    - condition: template
-                      value_template: "{{ input_trigger_strategy | string in ['5', '6'] }}"
-                    - condition: template
-                      value_template: "{{ input_update_sensor_str.startswith('input_boolean.') }}"
-            sequence:
-              - action: input_boolean.turn_off
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: or
-              conditions:
-                - condition: and
-                  conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['3', '4'] }}"
-                  - condition: template
-                    value_template: "{{ trigger.id == 'done_emhass' }}"
-                  - condition: template
-                    value_template: "{{ input_update_sensor_str.startswith('number.') }}"
-                - condition: and
-                  conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['5', '6'] }}"
-                  - condition: template
-                    value_template: "{{ input_update_sensor_str.startswith('number.') }}"
-            sequence:
-              - action: number.set_value
-                data:
-                  value: >
-                    {% if input_stop_value_overwrite == -1 %}
-                      {{ states(input_stop_sensor_str) | float(0) | round(0) }}
-                    {% else %}
-                      {{ input_stop_value_overwrite | float(0) | round(0) }}
-                    {% endif %}
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: or
-              conditions:
-                - condition: and
-                  conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['3', '4'] }}"
-                  - condition: template
-                    value_template: "{{ trigger.id == 'done_emhass' }}"
-                  - condition: template
-                    value_template: "{{ input_update_sensor_str.startswith('input_number.') }}"
-                - condition: and
-                  conditions:
-                  - condition: template
-                    value_template: "{{ input_trigger_strategy | string in ['5', '6'] }}"
-                  - condition: template
-                    value_template: "{{ input_update_sensor_str.startswith('input_number.') }}"
-            sequence:
-              - action: input_number.set_value
-                data:
-                  value: >
-                    {% if input_stop_value_overwrite == -1 %}
-                      {{ states(input_stop_sensor_str) | float(0) | round(0) }}
-                    {% else %}
-                      {{ input_stop_value_overwrite | float(0) | round(0) }}
-                    {% endif %}
-                target:
-                  entity_id: !input update_sensor
-            # --- Ensure that the strategy is followed and the devices are switched on
-          - conditions:
-            - condition: template
-              value_template: "{{ input_trigger_strategy | string in ['1', '2'] }}"
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('switch.') }}"
-            sequence:
-              - action: switch.turn_on
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_trigger_strategy | string in ['1', '2'] }}"
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('input_boolean.') }}"
-            sequence:
-              - action: input_boolean.turn_on
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_trigger_strategy | string in ['1', '2'] }}"
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('number.') }}"
-            sequence:
-              - action: number.set_value
-                data:
-                  value: "{{ states(input_stop_sensor_str) | float | round(0) }}"
-                target:
-                  entity_id: !input update_sensor
-          - conditions:
-            - condition: template
-              value_template: "{{ input_trigger_strategy | string in ['1', '2'] }}"
-            - condition: template
-              value_template: "{{ input_update_sensor_str.startswith('input_number.') }}"
-            sequence:
-              - action: input_number.set_value
-                data:
-                  value: "{{ states(input_stop_sensor_str) | float | round(0) }}"
-                target:
-                  entity_id: !input update_sensor
-
-      # --- If deferrable_load_single_constant is false and there is another load in the deferrable sensor,
-      # --- then we set the status to wait and not to done.
-      - if:
-          - condition: template
-            value_template: "{{ input_si | bool is false }}"
+      - alias: Send notification
+        if:
           - condition: template
             value_template: >
-              {% set schedule = state_attr(input_trigger_sensor_str, 'deferrables_schedule') | default([]) %}
-              {% set attribute_name = input_trigger_sensor_str.split('.')[1] %}
-              {% set schedule_sum = schedule | map(attribute=attribute_name) | map('float', 0) | sum | round(2)  %}
-              {{ schedule_sum > 0 }}
-          - condition: template
-            value_template: >
-              {{ input_si_work | bool }}
-        then:
-          - action: input_select.select_option
-            data:
-              option: wait
-            target:
-                entity_id: !input input_status
-        else:
-          - action: input_select.select_option
-            data:
-              option: done
-            target:
-                entity_id: !input input_status
-
-      # --- Run Notify
-      - if:
-          - condition: template
-            value_template: "{{ input_notify_done is not none and input_notify_done | trim != '' }}"
+              {% set config = context | from_json %}
+              {{ config.result.notify.enabled | default(false) | bool }}
         then:
           - alias: Send Message
-            action: "notify.{{ input_notify_group }}"
+            action: >
+              {% set config = context | from_json %}
+              notify.{{ config.result.notify.group | string }}
             data:
-              message: "{{ input_notify_done }}"
-
-  # --- Run Save settings
-  - alias: Update EMHASS JSON test field
-    if:
-      - condition: trigger
-        id:
-          - wait
-          - wait_cron
-          - force
-          - running
-          - running_emhass
-          - done
-          - done_emhass
-    then:
-      - alias: Update EMHASS settings
-        action: input_text.set_value
-        data:
-          value: >
-            {% set status = states(input_status_sensor_str) %}
-            {% set original_dict = payload_emhass_settings | from_json %}
-            {% set updated_dict = original_dict | combine({"us": status}) %}
-            {{ updated_dict | to_json }}
-        target:
-          entity_id: !input input_emhass
+              message: >
+                {% set config = context | from_json %}
+                {{ config.result.notify.message }}
 
 # -------------------
 # --- Automation Mode
 # -------------------
 
 mode: single
+max_exceeded: silent
+trace:
+  stored_traces: !input automation_trace_count

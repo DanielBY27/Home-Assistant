@@ -65,7 +65,6 @@ Please open an issue on my GitHub repository
 - **HA**: Home Assistant
 - **EMHASS**: Energy Management Optimization for Home Assistant
 - **Deferrable Loads**: Devices that are managed by EMHASS, which decides the optimal time to turn them on.
-- **Good Day**: In the context of energy, a "Good Day" is when your PV system can generate enough power to cover the next 24 hours of non-deferrable load consumption.
 
 ## Installation & Setup Guide
 
@@ -104,7 +103,7 @@ These will be used for your first deferrable load, but they are required to save
 1. **Input Text**:
     - Name: (e.g., `Dishwasher EMHASS JSON`)
     - Max Length: 255
-    - Initial value: `{"po":500,"ho":0.5,"st":0,"et":6,"se":false,"si":true,"mp":200,"pe":0,"us":"done"}`
+    - Initial value: `{"po":500,"ho":0.5,"st":0,"et":6,"se":false,"si":true,"mp":200,"pe":0,"us":"done","ss":0}`
         - po = Nominal Load Power (W)
         - ho = Total Operating Hours (h)
         - st = Initial Start Timestep
@@ -114,6 +113,7 @@ These will be used for your first deferrable load, but they are required to save
         - mp = Minimum Load Power (W)
         - pe = Startup Penalty Score
         - us = Status
+        - ss = Plan start timestamp
 2. **Input Select**:
     - Name: (e.g., `Dishwasher EMHASS Status`)
     - Options:
@@ -232,6 +232,16 @@ You can find my complete automation configurations here:
     - [Configuration](./examples/blueprints/emhass_basic_trigger_washing_machine.yaml)
     - Start Trigger Sensor is my Zigbee device
     - Stop Trigger is a 10-minute statistic sensor for this Zigbee device
+- PV Battery
+    - [Configuration](./examples/blueprints/emhass_basic_trigger_pv_battery.yaml)
+    - Start Trigger Cron
+    - Stop Trigger EMHASS or [sensor](./examples/sensors/emhass_pv_battery_load_from_grid_in.yaml)
+    - To charge my BYD battery with my Kostal inverter via the grid, I need another blueprint to enable charging via Modbus
+
+        [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A//raw.githubusercontent.com/DanielBY27/Home-Assistant/refs/heads/main/blueprints/automation/emhass_modbus_writer.yaml)
+
+        - [Configuration](./examples/blueprints/emhass_modbuss_writer_pv_battery.yaml)
+        - Start and Stop Trigger the Status from the main Basic Controller "PV Battery"
 - Water Boiler (only for PV surplus)
     - [Configuration](./examples/blueprints/emhass_basic_trigger_water_boiler.yaml)
     - Start and Stop Trigger are my Battery SoC Sensor from the Kostel integration
@@ -247,18 +257,10 @@ All modified controllers build upon the BASIC controller, then have additional i
     - [Configuration](./examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml)
     - [Trigger Sensor](./examples/sensors/emhass_go-echarger_trigger.yaml)
 
----
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A//raw.githubusercontent.com/DanielBY27/Home-Assistant/refs/heads/main/blueprints/automation/emhass_basic_trigger_pv_battery_modbus.yaml)
-
-- Load Home Battery over Kostal Inverter (Modbus)
-    - [Controller](./blueprints/automation/emhass_basic_trigger_pv_battery_modbus.yaml)
-    - [Configuration](./examples/blueprints/emhass_basic_trigger_pv_battery_modbus_blueprint.yaml)
-    - [Trigger Sensor](./examples/sensors/emhass_pv_battery_load_from_grid_in.yaml)
 
 ### References
 
 - https://emhass.readthedocs.io/
-
 
 
 [buymecoffee]: https://www.buymeacoffee.com/danielby27

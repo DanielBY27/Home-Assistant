@@ -28,7 +28,7 @@ use_blueprint:
         {{ ([0] * 96) }}
       {% endif %}
     emhass_config_soc_init: |-
-      {%- set min_soc = 5 -%}
+      {%- set min_soc = 20 -%}
       {%- set max_soc = 100 -%}
       {%- set reported_soc = states('sensor.scb_battery_soc') | float(0) -%}
       {%- set mapped_soc = (reported_soc - min_soc) / (max_soc - min_soc) -%}
@@ -42,17 +42,11 @@ use_blueprint:
       {%- set sunset_time = (state_attr('sun.sun', 'next_setting') | as_datetime
       | as_local).time() -%}
 
-      {%- set goog_day = states('binary_sensor.energy_config_good_day') -%}
+      {%- set night_soc = 0.2 -%}
 
-      {%- if goog_day -%}
-        {%- set night_soc = 0.3 -%}
-        {%- set first_half_day_soc = 0.45 -%}
-        {%- set second_half_day_soc = 0.75 -%}
-      {%- else -%}
-        {%- set night_soc = 0.15 -%}
-        {%- set first_half_day_soc = 0.2 -%}
-        {%- set second_half_day_soc = 0.25 -%}
-      {%- endif -%}
+      {%- set first_half_day_soc = 0.3 -%}
+
+      {%- set second_half_day_soc = 0.5 -%}
 
       {%- if current_time > sunset_time or current_time < sunrise_time -%}
         {{ night_soc }}
@@ -76,7 +70,7 @@ use_blueprint:
       - input_text.wallbox_emhass_json
       - input_text.pv_battery_emhass_json
     emhass_config_battery_discharge_power_max: 6000
-    emhass_config_battery_charge_power_max: 6000
+    emhass_config_battery_charge_power_max: 10000
     emhass_config_battery_nominal_energy_capacity: 18000
     emhass_config_sensor_power_photovoltaics: sensor.scb_solar_power
     emhass_config_sensor_power_load_no_var_loads: sensor.emhass_config_home_power_no_var_loads
@@ -89,3 +83,14 @@ use_blueprint:
     forecast_timer_minutes: "38"
     enable_publish_timer: true
     emhass_config_optimization_time_step: "15"
+    emhass_config_historic_days_to_retrieve: 30
+    emhass_config_mlforecaster_payload_overwrite: >-
+      {"split_date_delta": "96h", "kwargs": {"n_neighbors": 15, "leaf_size": 29,
+      "weights": "distance"}}
+    automation_logger_level: INFO
+    automation_trace_count: 30
+    automation_started_manually: log
+    emhass_config_inverter_ac_output_max: 10000
+    emhass_config_inverter_ac_input_max: 10000
+    emhass_config_set_nocharge_from_grid: false
+    emhass_config_battery_minimum_state_of_charge: 0.05

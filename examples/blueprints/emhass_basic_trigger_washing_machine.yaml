@@ -19,3 +19,4 @@ use_blueprint:
     notify_group: parents_mobile_phones
     notify_done: Waschmaschine ist fertig!
     emhass_config_optimization_time_step: "15"
+    automation_logger_level: INFO

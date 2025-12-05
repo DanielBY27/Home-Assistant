@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Modbus writer
+  name: EMHASS Modbus writer (v202512)
   description: |
     This blueprint allows you to write to a Modbus register. However, this requires an entry in the Home Assistant `configuration.yaml` file.
     Before writing to a Modbus register, read your device manual first!
@@ -19,6 +19,7 @@ blueprint:
             scan_interval: 20
     ```
   domain: automation
+  source_url: https://github.com/DanielBY27/Home-Assistant/blob/main/blueprints/automation/emhass_modbus_writer.yaml
   author: DanielBY27
   homeassistant:
     min_version: 2025.10.0
@@ -110,7 +111,7 @@ blueprint:
 # ----------------------------
 
 variables:
-
+  blueprint_version: v202512
   tmp_input_status: !input input_status
   tmp_modbus_config_hub: !input modbus_config_hub
   tmp_modbus_config_address: !input modbus_config_address

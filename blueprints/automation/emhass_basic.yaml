@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Basic Automation Controller
+  name: EMHASS Basic Automation Controller (v202512)
   description: |
     This blueprint acts as the central controller for the EMHASS (Energy Management Optimization for Home Assistant) integration.
     It is the **only** automation that should communicate directly with the EMHASS add-on.
@@ -15,6 +15,7 @@ blueprint:
     * A `rest_command` service defined in your `configuration.yaml` (e.g., `rest_command.emhass_rest_command`).
     * (Optional) One or more automations based on the `EMHASS Deferrable Load Controller` (emhass_basic_trigger.yaml) blueprint.
   domain: automation
+  source_url: https://github.com/DanielBY27/Home-Assistant/blob/main/blueprints/automation/emhass_basic.yaml
   author: DanielBY27
   homeassistant:
     min_version: 2025.10.0
@@ -27,7 +28,7 @@ blueprint:
 
     # --- EMHASS Input Timer
     grid_emhass_timer_config:
-      name: Timer Settings
+      name: Timer & Logging Settings
       description: >
         Configure the CRON timers that trigger the main EMHASS actions.
       collapsed: true
@@ -99,6 +100,51 @@ blueprint:
           selector:
             text:
               multiline: false
+        automation_trace_count:
+          name: Number of traces
+          description: >
+            Number of traces to be saved by this automation
+          default: 10
+          selector:
+            number:
+              min: 5
+              max: 90
+              step: 1
+              mode: box
+        automation_started_manually:
+          name: Automation started manually by user
+          description: >
+            If the automation is started manually, which section should be executed (log only = default)?
+          default: log
+          selector:
+            select:
+              options:
+                - label: log
+                  value: log
+                - label: save
+                  value: save
+                - label: forecast
+                  value: forecast
+                - label: optim
+                  value: optim
+                - label: publish
+                  value: publish
+                - label: all
+                  value: all
+        automation_logger_level:
+          name: Automation logger level
+          description: >
+            The logging level for this automation.
+          default: INFO
+          selector:
+            select:
+              options:
+                - label: DEBUG
+                  value: DEBUG
+                - label: WARNING
+                  value: WARNING
+                - label: INFO
+                  value: INFO
 
     # --- EMHASS Deferrable Loads Configuration
     grid_emhass_deferrable_loads_config:
@@ -351,13 +397,19 @@ blueprint:
                 - "15"
         emhass_config_historic_days_to_retrieve:
           name: historic_days_to_retrieve
-          description: >
-            Number of past days of data to retrieve from Home Assistant.
+          description: |
+            Number of past days of data to retrieve from Home Assistant. However, it is advised to provide more data for better accuracy by modifying your Home Assistant recorder settings.
+            Home-Assistant recorder setting example for your configuration.yaml:
+            ```
+            recorder:
+              purge_keep_days: 60
+            ```
+            If you use this setting, you should closely monitor your Home Assistant database. To further control its size, you can use [automation](https://github.com/DanielBY27/Home-Assistant/blob/main/examples/automation/ha_database_purge.yaml).
           default: 9
           selector:
             number:
-              min: 1
-              max: 10
+              min: 9
+              max: 60
               step: 1
               mode: box
         emhass_config_load_negative:
@@ -405,6 +457,34 @@ blueprint:
                 - mlforecaster
                 - typical
                 - naive
+        emhass_config_mlforecaster_payload_overwrite:
+          name: mlforecaster_payload_overwrite (JSON)
+          description: |
+            JSON definition to overwrite the mlforecaster api (forecast-model-fit) payload. Default Payload:
+            ```
+            {% set step = (emhass_config_optimization_time_step | int(30)) %}
+            {% set num_lags = (1440 / step) | int %}
+            {% set is_monday = (now().isoweekday() == 1) %}
+            {
+              "historic_days_to_retrieve": historic_days_to_retrieve,
+              "var_model": sensor_power_load_no_var_loads,
+              "sklearn_model": "KNeighborsRegressor",
+              "num_lags": num_lags,
+              "split_date_delta": "48h",
+              "perform_backtest": is_monday | bool
+            }
+            ```
+            Hints:
+            - To check the ML R2 value, it is best to switch to the "share" folder and run the command:
+              `awk '/Performing a machine learning forecast model fit/,/Obtaining params/' actionLogs.txt`
+            - To find out the best parameters you can use this:
+              `curl -i -H "Content-Type:application/json" -X POST -d '{"var_model": "sensor.emhass_config_home_power_no_var_loads", "historic_days_to_retrieve": 9}' http://localhost:5000/action/forecast-model-tune`
+              More details [here](https://emhass.readthedocs.io/en/latest/mlforecaster.html#the-tuning-method-with-bayesian-hyperparameter-optimization)
+          default: ""
+          selector:
+            text:
+              type: text
+              multiline: true
         emhass_config_set_total_pv_sell:
           name: set_total_pv_sell
           description: >
@@ -509,7 +589,7 @@ blueprint:
           selector:
             number:
               min: 100
-              max: 10000
+              max: 20000
               step: 100
               mode: box
         emhass_config_inverter_ac_input_max:
@@ -520,7 +600,7 @@ blueprint:
           selector:
             number:
               min: 100
-              max: 10000
+              max: 20000
               step: 100
               mode: box
         emhass_config_inverter_efficiency_dc_ac:
@@ -865,7 +945,7 @@ blueprint:
             number:
               min: 0.0
               max: 10.0
-              step: 0.1
+              step: 0.05
               mode: box
         emhass_config_battery_maximum_state_of_charge:
           name: battery_maximum_state_of_charge
@@ -876,7 +956,7 @@ blueprint:
             number:
               min: 0.0
               max: 10.0
-              step: 0.1
+              step: 0.05
               mode: box
         emhass_config_battery_target_state_of_charge:
           name: battery_target_state_of_charge
@@ -887,7 +967,7 @@ blueprint:
             number:
               min: 0.0
               max: 10.0
-              step: 0.1
+              step: 0.05
               mode: box
         # ignore_pv_feedback_during_curtailment
 
@@ -896,6 +976,11 @@ blueprint:
 # --------------------
 
 variables:
+  blueprint_version: v202512
+  automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
+  input_automation_logger_level: !input automation_logger_level
+  input_automation_trace_count: !input automation_trace_count
+  input_automation_started_manually: !input automation_started_manually
 
   # --- EMHASS Server Variables
   emhass_rest_name: !input emhass_rest_name
@@ -1007,6 +1092,7 @@ variables:
     {% endif %}
   emhass_config_load_cost_forecast_method: !input emhass_config_load_cost_forecast_method
   emhass_config_load_forecast_method: !input emhass_config_load_forecast_method
+  emhass_config_mlforecaster_payload_overwrite: !input emhass_config_mlforecaster_payload_overwrite
   emhass_config_load_negative: !input emhass_config_load_negative
   emhass_config_p_pv_forecast_raw: !input emhass_config_p_pv_forecast
   emhass_config_p_pv_forecast_calc: >
@@ -1023,284 +1109,173 @@ variables:
       {{ [single_value] * count }}
     {% endif %}
   list_emhass_deferrable_loads: !input list_emhass_deferrable_loads
-  emhass_config_end_timesteps_of_each_deferrable_load: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set single_constant_in = json_data['si'] | default(true) | bool %}
-      {% set operating_hours_in = json_data['ho'] | default(0) | float(0) | round(1) %}
-      {% set end_timestep_in = json_data['et'] | default(1) | float(0) | round(0) %}
-      {% set current_state_in = json_data['us'] | default('done') | string %}
-      {% if current_state_in in ['running', 'force'] %}
-        {% if single_constant_in %}
-          {% set total_runtime_h = operating_hours_in %}
-        {% else %}
-          {% set total_runtime_h = end_timestep_in / (60 / step_minutes) %}
-        {% endif %}
-        {% set start_time = states[entity_id].last_changed %}
-        {% set end_time = start_time + timedelta(hours=total_runtime_h) %}
-        {% set remaining_seconds = (end_time - now()).total_seconds() %}
-        {% set remaining_minutes = [0, remaining_seconds / 60] | max %}
-        {% set rounded_minutes = (remaining_minutes / step_minutes) | round(0, 'ceil') * step_minutes %}
-        {% set json_value = (rounded_minutes / step_minutes) | default(1) | float(0) | round(0) %}
-      {% else %}
-        {% set json_value = end_timestep_in %}
-      {% endif %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_minimum_power_of_deferrable_loads: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['mp'] | default(0) | float(0) | round(0) %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_nominal_power_of_deferrable_loads: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['po'] | default(0) | float(0) | round(0) %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_number_of_deferrable_loads: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {{ load_list | count | int(0) }}
-  emhass_config_operating_hours_of_each_deferrable_load: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set operating_hours_in = json_data['ho'] | default(0) | float(0) | round(1) %}
-      {% set end_timestep_in = json_data['et'] | default(1) | float(0) | round(0) %}
-      {% set current_state_in = json_data['us'] | default('done') | string %}
-      {% if current_state_in in ['running', 'force'] %}
-        {% set start_time = states[entity_id].last_changed %}
-        {% set total_runtime_h = operating_hours_in %}
-        {% set end_time = start_time + timedelta(hours=total_runtime_h) %}
-        {% set remaining_seconds = (end_time - now()).total_seconds() %}
-        {% set remaining_minutes = [0, remaining_seconds / 60] | max %}
-        {% set rounded_minutes = (remaining_minutes / step_minutes) | round(0, 'ceil') * step_minutes %}
-        {% set json_value = rounded_minutes / 60 | round(2) %}
-      {% elif current_state_in in ['wait', 'ready'] %}
-        {% set json_value = operating_hours_in %}
-      {% else %}
-        {% set json_value = 0 %}
-      {% endif %}
-      {% set rounded_json_value = ((json_value * 2) | round(0)) / 2 %}
-      {% set values.data = values.data + [rounded_json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_set_deferrable_load_single_constant: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['si'] | default(true) | bool %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_set_deferrable_startup_penalty: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['pe'] | default(0) | float(0) | round(0) %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_start_timesteps_of_each_deferrable_load: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set current_state_in = json_data['us'] | default('done') | string %}
-      {% if current_state_in in ['running', 'force'] %}
-        {% set json_value = 0 %}
-      {% elif current_state_in in ['wait', 'ready'] %}
-        {% set json_value = json_data['st'] | default(0) | float(0) | round(0) %}
-      {% else %}
-        {% set json_value = 0 %}
-      {% endif %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_treat_deferrable_load_as_semi_cont: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['se'] | default(false) | bool %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_config_trigger_status: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set json_data = states(entity_id) | from_json(default={}) %}
-      {% set json_value = json_data['us'] | default("done") | string %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
-  emhass_run_optim: >
-    {% set load_list = list_emhass_deferrable_loads %}
-    {% set time_delta_value = emhass_publish_minutes_timer_int + 1 | int %}
-    {% set time_delta = now() - timedelta(minutes=time_delta_value) %}
-    {% set values = namespace(data=[]) %}
-    {% for entity_id in load_list %}
-      {% set start_time = states[entity_id].last_changed %}
-      {% if start_time is not none and start_time > time_delta %}
-        {% set json_value = true %}
-      {% else %}
-        {% set json_value = false %}
-      {% endif %}
-      {% set values.data = values.data + [json_value] %}
-    {% endfor %}
-    {{ values.data }}
 
-  # --- EMHASS Payloads
-  payload_optim: >-
-    {% set payload = {
-      "soc_init": emhass_config_soc_init_calc,
-      "soc_final": emhass_config_soc_final_calc,
-      "load_cost_forecast": emhass_config_load_cost_forecast_calc,
-      "p_pv_forecast": emhass_config_p_pv_forecast_calc,
-      "pv_power_forecast": emhass_config_p_pv_forecast_calc,
-      "end_timesteps_of_each_deferrable_load": emhass_config_end_timesteps_of_each_deferrable_load,
-      "minimum_power_of_deferrable_loads": emhass_config_minimum_power_of_deferrable_loads,
-      "nominal_power_of_deferrable_loads": emhass_config_nominal_power_of_deferrable_loads,
-      "operating_hours_of_each_deferrable_load": emhass_config_operating_hours_of_each_deferrable_load,
-      "set_deferrable_load_single_constant": emhass_config_set_deferrable_load_single_constant,
-      "set_deferrable_startup_penalty": emhass_config_set_deferrable_startup_penalty,
-      "start_timesteps_of_each_deferrable_load": emhass_config_start_timesteps_of_each_deferrable_load,
-      "treat_deferrable_load_as_semi_cont": emhass_config_treat_deferrable_load_as_semi_cont
+  # Read in all currently available values and save it read-only in this variable
+  snapshot: >
+    {% set now_dt = now() %}
+    {% set emhass_ml_forecast_json_overwrite_tmp = emhass_config_mlforecaster_payload_overwrite | default('') | string %}
+    {% set step_minutes = emhass_config_optimization_time_step | default(30) | int %}
+    {% set steps_per_hour = 60 / step_minutes %}
+    {% set snapshot_base = {
+      'current_time': now_dt | as_datetime | as_local | string,
+      'automation_logger_level': input_automation_logger_level | default('info') | string | lower,
+      'automation_started_manually': input_automation_started_manually | default('log') | string | lower,
+      'emhass_optimization_time_step': step_minutes,
+      'emhass_step_value_hour': (1 / steps_per_hour) | float,
+      'emhass_steps_per_hour': (60 / step_minutes) | int,
+      'emhass_current_time_delta': (now_dt - timedelta(minutes=step_minutes)) | as_datetime | as_local | string,
+      'emhass_current_time_delta_publish': (now_dt - timedelta(minutes=(emhass_publish_minutes_timer_int + 1 | default(6) | int))) | as_datetime | as_local | string,
+      'emhass_historic_days_to_retrieve': emhass_config_historic_days_to_retrieve | default(9) | int,
+      'emhass_num_lags': (1440 / step_minutes) | int,
+      'emhass_ml_forecast_json_default': {
+        'historic_days_to_retrieve': emhass_config_historic_days_to_retrieve | default(9) | int,
+        'var_model': emhass_config_sensor_power_load_no_var_loads | string,
+        'sklearn_model': 'KNeighborsRegressor',
+        'num_lags': (1440 / step_minutes) | int,
+        'split_date_delta': '48h',
+        'perform_backtest': ((now_dt | as_datetime | as_local).isoweekday() == 1) | bool
+      },
+      'emhass_ml_forecast_json_overwrite': emhass_ml_forecast_json_overwrite_tmp | from_json if emhass_ml_forecast_json_overwrite_tmp | length > 0 else {},
+      'is_monday': ((now_dt | as_datetime | as_local).isoweekday() == 1) | bool
     } %}
-    {{ payload | to_json }}
-  payload_publish: {}
-  payload_save: >-
-    {% set payload = {
-      "soc_init": emhass_config_soc_init_calc,
-      "soc_final": emhass_config_soc_final_calc,
-      "battery_charge_efficiency": emhass_config_battery_charge_efficiency,
-      "battery_charge_power_max": emhass_config_battery_charge_power_max,
-      "battery_discharge_efficiency": emhass_config_battery_discharge_efficiency,
-      "battery_discharge_power_max": emhass_config_battery_discharge_power_max,
-      "battery_dynamic_max": emhass_config_battery_dynamic_max,
-      "battery_dynamic_min": emhass_config_battery_dynamic_min,
-      "battery_maximum_state_of_charge": emhass_config_battery_maximum_state_of_charge,
-      "battery_minimum_state_of_charge": emhass_config_battery_minimum_state_of_charge,
-      "battery_nominal_energy_capacity": emhass_config_battery_nominal_energy_capacity,
-      "battery_target_state_of_charge": emhass_config_battery_target_state_of_charge,
-      "adjusted_pv_regression_model": emhass_config_adjusted_pv_regression_model,
-      "adjusted_pv_solar_elevation_threshold": emhass_config_adjusted_pv_solar_elevation_threshold,
-      "compute_curtailment": emhass_config_compute_curtailment,
-      "continual_publish": emhass_config_continual_publish,
-      "costfun": emhass_config_costfun,
-      "delta_forecast_daily": emhass_config_delta_forecast_daily,
-      "historic_days_to_retrieve": emhass_config_historic_days_to_retrieve,
-      "inverter_ac_input_max": emhass_config_inverter_ac_input_max,
-      "inverter_ac_output_max": emhass_config_inverter_ac_output_max,
-      "inverter_efficiency_ac_dc": emhass_config_inverter_efficiency_ac_dc,
-      "inverter_efficiency_dc_ac": emhass_config_inverter_efficiency_dc_ac,
-      "inverter_is_hybrid": emhass_config_inverter_is_hybrid,
-      "logging_level": emhass_config_logging_level,
-      "lp_solver": emhass_config_lp_solver,
-      "lp_solver_path": emhass_config_lp_solver_path,
-      "lp_solver_timeout": emhass_config_lp_solver_timeout,
-      "maximum_power_from_grid": emhass_config_maximum_power_from_grid,
-      "maximum_power_to_grid": emhass_config_maximum_power_to_grid,
-      "method_ts_round": emhass_config_method_ts_round,
-      "modules_per_string": emhass_config_modules_per_string | from_json,
-      "num_threads": emhass_config_num_threads,
-      "open_meteo_cache_max_age": emhass_config_open_meteo_cache_max_age,
-      "optimization_time_step": emhass_config_optimization_time_step | int(30),
-      "production_price_forecast_method": emhass_config_production_price_forecast_method,
-      "pv_inverter_model": emhass_config_pv_inverter_model | from_json,
-      "pv_module_model": emhass_config_pv_module_model | from_json,
-      "set_battery_dynamic": emhass_config_set_battery_dynamic,
-      "set_nocharge_from_grid": emhass_config_set_nocharge_from_grid,
-      "set_nodischarge_to_grid": emhass_config_set_nodischarge_to_grid,
-      "set_total_pv_sell": emhass_config_set_total_pv_sell,
-      "set_use_adjusted_pv": emhass_config_set_use_adjusted_pv,
-      "set_use_battery": emhass_config_set_use_battery,
-      "set_use_pv": emhass_config_set_use_pv,
-      "set_zero_min": emhass_config_set_zero_min,
-      "solar_forecast_kwp": emhass_config_solar_forecast_kwp,
-      "photovoltaic_production_sell_price": emhass_config_photovoltaic_production_sell_price,
-      "sensor_power_load_no_var_loads": emhass_config_sensor_power_load_no_var_loads,
-      "sensor_power_photovoltaics": emhass_config_sensor_power_photovoltaics,
-      "sensor_replace_zero": [ emhass_config_sensor_power_photovoltaics | string ],
-      "strings_per_inverter": emhass_config_strings_per_inverter | from_json,
-      "surface_azimuth": emhass_config_surface_azimuth | from_json,
-      "surface_tilt": emhass_config_surface_tilt | from_json,
-      "weather_forecast_method": emhass_config_weather_forecast_method,
-      "weight_battery_charge": emhass_config_weight_battery_charge,
-      "weight_battery_discharge": emhass_config_weight_battery_discharge,
-      "get_data_from_home_assistant": emhass_config_get_data_from_home_assistant,
-      "force_update_data": emhass_config_force_update_data,
-      "set_forecast_to_hass": emhass_config_set_forecast_to_hass,
-      "load_offpeak_hours_cost": emhass_config_load_offpeak_hours_cost,
-      "load_peak_hour_periods": emhass_config_load_peak_hour_periods | from_json,
-      "load_peak_hours_cost": emhass_config_load_peak_hours_cost,
-      "load_cost_forecast": emhass_config_load_cost_forecast_calc,
-      "load_cost_forecast_method": emhass_config_load_cost_forecast_method,
-      "load_forecast_method": emhass_config_load_forecast_method,
-      "load_negative": emhass_config_load_negative,
-      "p_pv_forecast": emhass_config_p_pv_forecast_calc,
-      "pv_power_forecast": emhass_config_p_pv_forecast_calc,
-      "sensor_linear_interp": [
-        emhass_config_sensor_power_photovoltaics | string,
-        emhass_config_sensor_power_load_no_var_loads | string
-        ],
-      "end_timesteps_of_each_deferrable_load": emhass_config_end_timesteps_of_each_deferrable_load,
-      "minimum_power_of_deferrable_loads": ([0] * emhass_config_number_of_deferrable_loads),
-      "nominal_power_of_deferrable_loads": ([0] * emhass_config_number_of_deferrable_loads),
-      "number_of_deferrable_loads": emhass_config_number_of_deferrable_loads,
-      "operating_hours_of_each_deferrable_load": ([0] * emhass_config_number_of_deferrable_loads),
-      "set_deferrable_load_single_constant": emhass_config_set_deferrable_load_single_constant,
-      "set_deferrable_startup_penalty": emhass_config_set_deferrable_startup_penalty,
-      "start_timesteps_of_each_deferrable_load": emhass_config_start_timesteps_of_each_deferrable_load,
-      "treat_deferrable_load_as_semi_cont": emhass_config_treat_deferrable_load_as_semi_cont
+
+    {# --- Namespace initialisieren --- #}
+    {% set ns = namespace(
+      trigger_json=[], emhass_po=[], emhass_ho=[], emhass_st=[], emhass_et=[], emhass_se=[],
+      emhass_si=[], emhass_mp=[], emhass_pe=[], emhass_us=[], emhass_ss=[], emhass_changed=[],
+      count=[], count_done=[], count_open=[], count_open_work=[],
+      power=[], power_current=[], power_done=[], power_done_min=[],
+      power_done_max=[], power_open=[], power_open_min=[], power_open_max=[]
+    ) %}
+
+    {% for item in list_emhass_deferrable_loads | default([]) %}
+      {# --- Daten Laden --- #}
+      {% set trigger_json_input = states(item) | from_json(default={}) %}
+      {% set trigger_json_obj = states[item] %}
+
+      {# --- Rohdaten Listen befüllen --- #}
+      {% set ns.trigger_json = ns.trigger_json + [trigger_json_input | to_json] %}
+      {% set ns.emhass_po = ns.emhass_po + [trigger_json_input.get('po', 0) | int] %}
+      {% set ns.emhass_ho = ns.emhass_ho + [trigger_json_input.get('ho', 0) | float] %}
+      {% set ns.emhass_st = ns.emhass_st + [trigger_json_input.get('st', 0) | int] %}
+      {% set ns.emhass_et = ns.emhass_et + [trigger_json_input.get('et', 0) | int] %}
+      {% set ns.emhass_se = ns.emhass_se + [trigger_json_input.get('se', false) | bool] %}
+      {% set ns.emhass_si = ns.emhass_si + [trigger_json_input.get('si', true) | bool] %}
+      {% set ns.emhass_mp = ns.emhass_mp + [trigger_json_input.get('mp', 0) | int] %}
+      {% set ns.emhass_pe = ns.emhass_pe + [trigger_json_input.get('pe', 0) | int] %}
+      {% set ns.emhass_us = ns.emhass_us + [trigger_json_input.get('us', 'done') | string] %}
+      {% set ns.emhass_ss = ns.emhass_ss + [trigger_json_input.get('ss', 0) | int] %}
+
+      {# --- Change Detection --- #}
+      {% if trigger_json_obj is not none %}
+        {% set is_changed_recently = (trigger_json_obj.last_changed > snapshot_base.emhass_current_time_delta_publish | as_datetime) | default(true) | bool %}
+      {% else %}
+        {% set is_changed_recently = false %}
+      {% endif %}
+      {% set ns.emhass_changed = ns.emhass_changed + [is_changed_recently] %}
+
+      {# --- Power Sensor Logik --- #}
+      {% set emhass_sensor = 'sensor.p_deferrable' ~ loop.index0 %}
+      {% set emhass_sensor_attribute_name = (emhass_sensor | string).split('.')[-1] %}
+      {% set current_power_val = states(emhass_sensor) | default(0) | int %}
+      {% set ns.power_current = ns.power_current + [current_power_val] %}
+
+      {# --- Schedule Analyse --- #}
+      {% set ns_deferrable = namespace(count=0, count_done=0, count_open=0, count_open_work=0,
+          power=0, power_done=0, power_done_min=0, power_done_max=0, power_open=0, power_open_min=0, power_open_max=0)
+      %}
+
+      {% set emhass_sensor_deferrables_schedule_list = (state_attr(emhass_sensor, 'deferrables_schedule') | default([])) %}
+      {% if emhass_sensor_deferrables_schedule_list is iterable %}
+        {% for item_deferrable in emhass_sensor_deferrables_schedule_list %}
+          {% set p = item_deferrable[emhass_sensor_attribute_name] | float(0) %}
+          {% set d = item_deferrable.date | as_datetime %}
+          {% set ns_deferrable.count = ns_deferrable.count + 1 %}
+          {% set ns_deferrable.power = ns_deferrable.power + p %}
+
+          {# Zukünftige Slots filtern #}
+          {% if d >= (now_dt - timedelta(minutes=step_minutes)) %}
+            {% set ns_deferrable.count_open = ns_deferrable.count_open + 1 %}
+            {% set ns_deferrable.power_open = ns_deferrable.power_open + p %}
+
+            {# NEU: Zähle nur Slots mit echter Arbeit (> 0 Watt) #}
+            {% if p > 0 %}
+              {% set ns_deferrable.count_open_work = ns_deferrable.count_open_work + 1 %}
+
+              {% if ns_deferrable.power_open_min <= 0 %}
+                {% set ns_deferrable.power_open_min = p %}
+              {% else %}
+                {% set ns_deferrable.power_open_min = [ns_deferrable.power_open_min, p] | min %}
+              {% endif %}
+              {% set ns_deferrable.power_open_max = [ns_deferrable.power_open_max, p] | max %}
+            {% endif %}
+          {% else %}
+            {# Vergangene Slots #}
+            {% if ns_deferrable.power_done_min <= 0 %}
+              {% set ns_deferrable.power_done_min = p %}
+            {% else %}
+              {% set ns_deferrable.power_done_min = [ns_deferrable.power_done_min, p] | min %}
+            {% endif %}
+            {% set ns_deferrable.power_done_max = [ns_deferrable.power_done_max, p] | max %}
+            {% set ns_deferrable.count_done = ns_deferrable.count_done + 1 %}
+            {% set ns_deferrable.power_done = ns_deferrable.power_done + p %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      {# --- Stats in Hauptlisten schieben --- #}
+      {% set ns.count = ns.count + [ns_deferrable.count] %}
+      {% set ns.count_done = ns.count_done + [ns_deferrable.count_done] %}
+      {% set ns.count_open = ns.count_open + [ns_deferrable.count_open] %}
+      {% set ns.count_open_work = ns.count_open_work + [ns_deferrable.count_open_work] %}
+      {% set ns.power = ns.power + [ns_deferrable.power] %}
+      {% set ns.power_done = ns.power_done + [ns_deferrable.power_done] %}
+      {% set ns.power_done_min = ns.power_done_min + [ns_deferrable.power_done_min] %}
+      {% set ns.power_done_max = ns.power_done_max + [ns_deferrable.power_done_max] %}
+      {% set ns.power_open = ns.power_open + [ns_deferrable.power_open] %}
+      {% set ns.power_open_min = ns.power_open_min + [ns_deferrable.power_open_min] %}
+      {% set ns.power_open_max = ns.power_open_max + [ns_deferrable.power_open_max] %}
+    {% endfor %}
+
+    {# --- Output zusammenbauen --- #}
+    {% set def = {
+      'trigger_json': ns.trigger_json,
+      'emhass_trigger_po': ns.emhass_po,
+      'emhass_trigger_ho': ns.emhass_ho,
+      'emhass_trigger_st': ns.emhass_st,
+      'emhass_trigger_et': ns.emhass_et,
+      'emhass_trigger_se': ns.emhass_se,
+      'emhass_trigger_si': ns.emhass_si,
+      'emhass_trigger_mp': ns.emhass_mp,
+      'emhass_trigger_pe': ns.emhass_pe,
+      'emhass_trigger_us': ns.emhass_us,
+      'emhass_trigger_ss': ns.emhass_ss,
+      'emhass_trigger_changed': ns.emhass_changed,
+      'emhass_deferrable_count': ns.count,
+      'emhass_deferrable_count_done': ns.count_done,
+      'emhass_deferrable_count_open': ns.count_open,
+      'emhass_deferrable_count_open_work': ns.count_open_work,
+      'emhass_deferrable_power': ns.power,
+      'emhass_deferrable_power_current': ns.power_current,
+      'emhass_deferrable_power_done': ns.power_done,
+      'emhass_deferrable_power_done_min': ns.power_done_min,
+      'emhass_deferrable_power_done_max': ns.power_done_max,
+      'emhass_deferrable_power_open': ns.power_open,
+      'emhass_deferrable_power_open_min': ns.power_open_min,
+      'emhass_deferrable_power_open_max': ns.power_open_max
     } %}
-    {{ payload | to_json }}
-  payload_forecast: >-
-    {% set step = (emhass_config_optimization_time_step | int(30)) %}
-    {% set hist_days = (emhass_config_historic_days_to_retrieve | int(9)) %}
-    {% set steps_per_day = (1440 / step) | int %}
-    {% if hist_days >= 14 %}
-      {% set train_days = 7 %}
-    {% else %}
-      {% set train_days = 4 %}
-    {% endif %}
-    {% set num_lags = steps_per_day %}
-    {% set split_date_delta_hours = (train_days * 24) | int %}
-    {% set min_needed_days = train_days + 1 %}
-    {% if hist_days < min_needed_days %}
-      {% set hist_days = min_needed_days %}
-    {% endif %}
-    {% set payload = {
-        "historic_days_to_retrieve": hist_days ,
-        "var_model": emhass_config_sensor_power_load_no_var_loads | string,
-        "sklearn_model": "KNeighborsRegressor",
-        "num_lags": num_lags,
-        "split_date_delta": split_date_delta_hours | string + "h",
-        "perform_backtest": false
-      } %}
-    {{ payload | to_json }}
+    {{ (snapshot_base | combine(def)) | to_json }}
 
 # -------------------
 # --- EMHASS Triggers
 # -------------------
 
 triggers:
+
+  # --- Run by HA Start
+  - trigger: homeassistant
+    event: start
+    id: ha_start
 
   # --- Publish and Optim Data
   - trigger: time_pattern
@@ -1337,58 +1312,308 @@ conditions: []
 
 actions:
 
-  # --- Run optim and publish
-  - alias: Run optim and publish
-    if:
-      - condition: trigger
-        id:
-          - publish
-    then:
-      - if:
-          - condition: template
-            value_template: >
-              {% set run_optim_check = (emhass_run_optim | select('equalto', true) | list) | length > 0 %}
-              {% set is_every_four_hours = (now().hour % 4 == 0) and (now().minute == 0) %}
-              {{ run_optim_check or is_every_four_hours }}
-        then:
-          - action: system_log.write
-            data:
-              level: debug
-              message: "Log emhass_basic operating_hours: {{ emhass_config_operating_hours_of_each_deferrable_load }}"
-              logger: 'blueprint.emhass_basic'
-          - action: system_log.write
-            data:
-              level: debug
-              message: "Log emhass_basic end_timestamps: {{ emhass_config_end_timesteps_of_each_deferrable_load }}"
-              logger: 'blueprint.emhass_basic'
-          - action: !input emhass_rest_name
-            data:
-              protocol: !input emhass_protocol
-              host: !input emhass_host
-              port: !input emhass_port
-              api: !input emhass_api_optim
-              payload: "{{ payload_optim }}"
-            response_variable: response_payload_optim
-          - delay:
-              hours: 0
-              minutes: 0
-              seconds: 5
-              milliseconds: 0
-      - action: !input emhass_rest_name
-        data:
-          protocol: !input emhass_protocol
-          host: !input emhass_host
-          port: !input emhass_port
-          api: !input emhass_api_publish
-          payload: "{{ payload_publish }}"
-        response_variable: response_payload_publish
+  - variables:
+      context: >
+        {% set config = snapshot | from_json %}
+        {% set automation_trigger_id = trigger.id | default('none') | string | lower %}
+        {% set current_time = (config.current_time | as_datetime) %}
+        {% set res = namespace(
+          publish_enabled = false, optim_enabled = false, save_enabled = false, forecast_enabled = false,
+          new_ho = [], new_st = [], new_et = [], log_msg = [])
+        %}
 
-  # --- Run Save
-  - alias: Run emhass save
+        {% set res.log_msg = res.log_msg + ['Automation started by trigger id ' ~ automation_trigger_id] %}
+
+        {# --- Action save enabled --- #}
+        {% if
+            (
+              automation_trigger_id == 'save'
+            ) or (
+              automation_trigger_id == 'none' and
+              config.automation_started_manually in ['all', 'save']
+            )
+        %}
+          {% set res.log_msg = res.log_msg + ['Action save enabled'] %}
+          {% set res.save_enabled = true %}
+        {% endif %}
+
+        {# --- Action forecast enabled --- #}
+        {% if
+            (
+              automation_trigger_id == 'forecast'
+            ) or (
+              automation_trigger_id == 'none' and
+              config.automation_started_manually in ['all', 'forecast']
+            )
+        %}
+          {% set res.log_msg = res.log_msg + ['Action forecast enabled'] %}
+          {% set res.forecast_enabled = true %}
+        {% endif %}
+
+        {# --- Action optim enabled --- #}
+        {% for i in range(config.trigger_json | length) %}
+          {% if
+              (
+                config.emhass_trigger_changed[i] and
+                automation_trigger_id == 'publish' and
+                (
+                  (
+                    config.emhass_trigger_us[i] == 'wait' and
+                    config.emhass_deferrable_power_open[i] == 0
+                  ) or (
+                    (config.emhass_trigger_us[i] in ['running', 'force'] or (config.emhass_trigger_us[i]).startswith('force-')) and
+                    config.emhass_deferrable_power_current[i] == 0
+                  ) or (
+                    config.emhass_trigger_us[i] == 'done' and
+                    config.emhass_deferrable_power_open[i] > 0
+                  )
+                )
+              ) or (
+                automation_trigger_id == 'none' and
+                config.automation_started_manually in ['all', 'optim']
+              ) or (
+                (current_time).hour % 4 == 0 and
+                (current_time).minute == 0
+              )
+          %}
+            {% set res.log_msg = res.log_msg + ['Action optim enabled by sensor.p_deferrable' ~ i] %}
+            {% set res.optim_enabled = true %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        {# --- Action publish enabled --- #}
+        {% if
+            (
+              automation_trigger_id in ['publish', 'ha_start']
+            ) or (
+              automation_trigger_id == 'none' and
+              config.automation_started_manually in ['all', 'publish']
+            )
+        %}
+          {% set res.log_msg = res.log_msg + ['Action publish enabled'] %}
+          {% set res.publish_enabled = true %}
+        {% endif %}
+
+        {# --- Action recalculate running triggers for new optim --- #}
+        {% for i in range(config.trigger_json | length) %}
+          {% set calc_trigger = namespace(
+            ho = config.emhass_trigger_ho[i], st = config.emhass_trigger_st[i], et = config.emhass_trigger_et[i],
+            sensor_ho = 0)
+          %}
+
+          {% if config.emhass_trigger_si[i] == true %}
+            {% set calc_trigger.sensor_ho = config.emhass_deferrable_count_open_work[i] * config.emhass_step_value_hour %}
+          {% else %}
+            {% set calc_trigger.sensor_ho = (config.emhass_deferrable_power_open[i] * config.emhass_step_value_hour) / config.emhass_trigger_po[i] %}
+          {% endif %}
+
+          {% if config.emhass_trigger_ss[i] > 0 and calc_trigger.sensor_ho > 0.01 %}
+            {% set res.log_msg = res.log_msg + ['Recalculate trigger data (ho/st/et) for sensor.p_deferrable' ~ i] %}
+            {% set calc_trigger.ho = ((calc_trigger.sensor_ho * config.emhass_steps_per_hour) | round(0)) / config.emhass_steps_per_hour %}
+            {% set calc_trigger.st = 0 %}
+            {% set elapsed_seconds = as_timestamp((config.emhass_current_time_delta | as_datetime)) - config.emhass_trigger_ss[i] %}
+            {% set elapsed_steps = (elapsed_seconds / 60) / config.emhass_optimization_time_step %}
+            {% if
+              config.emhass_trigger_si[i] == true and
+              (
+                config.emhass_deferrable_power_current[i] > 0 or
+                config.emhass_trigger_us[i] == 'force' or
+                (config.emhass_trigger_us[i]).startswith('force-')
+              )
+            %}
+              {% set calc_trigger.et = config.emhass_deferrable_count_open_work[i] %}
+            {% else %}
+              {% set calc_trigger.et = (config.emhass_trigger_et[i] - elapsed_steps) | int %}
+            {% endif %}
+            {% if calc_trigger.et < 0 %}
+              {% set calc_trigger.et = 0 %}
+            {% endif %}
+          {% else %}
+            {% if config.emhass_trigger_us[i] in ['running', 'force'] or (config.emhass_trigger_us[i]).startswith('force-') %}
+              {% set res.log_msg = res.log_msg + ['WARNING: It appears that more energy is being used than planned. Check that ho, st, and et are still correct.'] %}
+              {% set res.log_msg = res.log_msg + ['WARNING: The emhass plan does not include additional energy, even though it is in an active state.'] %}
+            {% endif %}
+            {% set res.log_msg = res.log_msg + ['Input (Fallback/Start) for sensor.p_deferrable' ~ i] %}
+          {% endif %}
+
+          {% set res.new_ho = res.new_ho + [calc_trigger.ho] %}
+          {% set res.new_st = res.new_st + [calc_trigger.st] %}
+          {% set res.new_et = res.new_et + [calc_trigger.et] %}
+        {% endfor %}
+        {% set res.log_msg = res.log_msg + ['New ho / st / et: ' ~ (res.new_ho | join('; ')) ~ ' / ' ~ (res.new_st | join('; ')) ~ ' / ' ~ (res.new_et | join('; '))] %}
+
+        {{ {
+          'automation': {
+            'trigger_id': automation_trigger_id,
+            'logger_level': config.automation_logger_level,
+            'started_manually': config.automation_started_manually,
+            'publish_enabled': res.publish_enabled,
+            'optim_enabled': res.optim_enabled,
+            'save_enabled': res.save_enabled,
+            'forecast_enabled': res.forecast_enabled
+          },
+          'result': {
+            'optim': {
+              'soc_init': emhass_config_soc_init_calc,
+              'soc_final': emhass_config_soc_final_calc,
+              'load_cost_forecast': emhass_config_load_cost_forecast_calc,
+              'p_pv_forecast': emhass_config_p_pv_forecast_calc,
+              'pv_power_forecast': emhass_config_p_pv_forecast_calc,
+              'end_timesteps_of_each_deferrable_load': res.new_et,
+              'minimum_power_of_deferrable_loads': config.emhass_trigger_mp,
+              'nominal_power_of_deferrable_loads': config.emhass_trigger_po,
+              'operating_hours_of_each_deferrable_load': res.new_ho,
+              'set_deferrable_load_single_constant': config.emhass_trigger_si,
+              'set_deferrable_startup_penalty': config.emhass_trigger_pe,
+              'start_timesteps_of_each_deferrable_load': res.new_st,
+              'treat_deferrable_load_as_semi_cont': config.emhass_trigger_se
+            },
+            'publish': {},
+            'save': {
+              'soc_init': emhass_config_soc_init_calc,
+              'soc_final': emhass_config_soc_final_calc,
+              'battery_charge_efficiency': emhass_config_battery_charge_efficiency,
+              'battery_charge_power_max': emhass_config_battery_charge_power_max,
+              'battery_discharge_efficiency': emhass_config_battery_discharge_efficiency,
+              'battery_discharge_power_max': emhass_config_battery_discharge_power_max,
+              'battery_dynamic_max': emhass_config_battery_dynamic_max,
+              'battery_dynamic_min': emhass_config_battery_dynamic_min,
+              'battery_maximum_state_of_charge': emhass_config_battery_maximum_state_of_charge,
+              'battery_minimum_state_of_charge': emhass_config_battery_minimum_state_of_charge,
+              'battery_nominal_energy_capacity': emhass_config_battery_nominal_energy_capacity,
+              'battery_target_state_of_charge': emhass_config_battery_target_state_of_charge,
+              'adjusted_pv_regression_model': emhass_config_adjusted_pv_regression_model,
+              'adjusted_pv_solar_elevation_threshold': emhass_config_adjusted_pv_solar_elevation_threshold,
+              'compute_curtailment': emhass_config_compute_curtailment,
+              'continual_publish': emhass_config_continual_publish,
+              'costfun': emhass_config_costfun,
+              'delta_forecast_daily': emhass_config_delta_forecast_daily,
+              'historic_days_to_retrieve': emhass_config_historic_days_to_retrieve,
+              'inverter_ac_input_max': emhass_config_inverter_ac_input_max,
+              'inverter_ac_output_max': emhass_config_inverter_ac_output_max,
+              'inverter_efficiency_ac_dc': emhass_config_inverter_efficiency_ac_dc,
+              'inverter_efficiency_dc_ac': emhass_config_inverter_efficiency_dc_ac,
+              'inverter_is_hybrid': emhass_config_inverter_is_hybrid,
+              'logging_level': emhass_config_logging_level,
+              'lp_solver': emhass_config_lp_solver,
+              'lp_solver_path': emhass_config_lp_solver_path,
+              'lp_solver_timeout': emhass_config_lp_solver_timeout,
+              'maximum_power_from_grid': emhass_config_maximum_power_from_grid,
+              'maximum_power_to_grid': emhass_config_maximum_power_to_grid,
+              'method_ts_round': emhass_config_method_ts_round,
+              'modules_per_string': emhass_config_modules_per_string | from_json,
+              'num_threads': emhass_config_num_threads,
+              'open_meteo_cache_max_age': emhass_config_open_meteo_cache_max_age,
+              'optimization_time_step': emhass_config_optimization_time_step | int(30),
+              'production_price_forecast_method': emhass_config_production_price_forecast_method,
+              'pv_inverter_model': emhass_config_pv_inverter_model | from_json,
+              'pv_module_model': emhass_config_pv_module_model | from_json,
+              'set_battery_dynamic': emhass_config_set_battery_dynamic,
+              'set_nocharge_from_grid': emhass_config_set_nocharge_from_grid,
+              'set_nodischarge_to_grid': emhass_config_set_nodischarge_to_grid,
+              'set_total_pv_sell': emhass_config_set_total_pv_sell,
+              'set_use_adjusted_pv': emhass_config_set_use_adjusted_pv,
+              'set_use_battery': emhass_config_set_use_battery,
+              'set_use_pv': emhass_config_set_use_pv,
+              'set_zero_min': emhass_config_set_zero_min,
+              'solar_forecast_kwp': emhass_config_solar_forecast_kwp,
+              'photovoltaic_production_sell_price': emhass_config_photovoltaic_production_sell_price,
+              'sensor_power_load_no_var_loads': emhass_config_sensor_power_load_no_var_loads,
+              'sensor_power_photovoltaics': emhass_config_sensor_power_photovoltaics,
+              'sensor_replace_zero': [ emhass_config_sensor_power_photovoltaics | string ],
+              'strings_per_inverter': emhass_config_strings_per_inverter | from_json,
+              'surface_azimuth': emhass_config_surface_azimuth | from_json,
+              'surface_tilt': emhass_config_surface_tilt | from_json,
+              'weather_forecast_method': emhass_config_weather_forecast_method,
+              'weight_battery_charge': emhass_config_weight_battery_charge,
+              'weight_battery_discharge': emhass_config_weight_battery_discharge,
+              'get_data_from_home_assistant': emhass_config_get_data_from_home_assistant,
+              'force_update_data': emhass_config_force_update_data,
+              'set_forecast_to_hass': emhass_config_set_forecast_to_hass,
+              'load_offpeak_hours_cost': emhass_config_load_offpeak_hours_cost,
+              'load_peak_hour_periods': emhass_config_load_peak_hour_periods | from_json,
+              'load_peak_hours_cost': emhass_config_load_peak_hours_cost,
+              'load_cost_forecast': emhass_config_load_cost_forecast_calc,
+              'load_cost_forecast_method': emhass_config_load_cost_forecast_method,
+              'load_forecast_method': emhass_config_load_forecast_method,
+              'load_negative': emhass_config_load_negative,
+              'p_pv_forecast': emhass_config_p_pv_forecast_calc,
+              'pv_power_forecast': emhass_config_p_pv_forecast_calc,
+              'sensor_linear_interp': [
+                emhass_config_sensor_power_photovoltaics | string,
+                emhass_config_sensor_power_load_no_var_loads | string
+              ],
+              'end_timesteps_of_each_deferrable_load': res.new_et,
+              'minimum_power_of_deferrable_loads': config.emhass_trigger_mp,
+              'nominal_power_of_deferrable_loads': config.emhass_trigger_po,
+              'number_of_deferrable_loads': config.trigger_json | length,
+              'operating_hours_of_each_deferrable_load': ([0] * (config.trigger_json | length)),
+              'set_deferrable_load_single_constant': config.emhass_trigger_si,
+              'set_deferrable_startup_penalty': config.emhass_trigger_pe,
+              'start_timesteps_of_each_deferrable_load': res.new_st,
+              'treat_deferrable_load_as_semi_cont': config.emhass_trigger_se
+            },
+            'forecast': config.emhass_ml_forecast_json_default | combine(config.emhass_ml_forecast_json_overwrite)
+          },
+          'logs': res.log_msg
+        } | to_json }}
+
+  # --- Run EMHASS Actions
+  - alias: Logging
+    parallel:
+    - alias: Info logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level == 'info' }}
+      then:
+        - service: system_log.write
+          data:
+            level: info
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [INFO]:
+              result data: {{ (context | from_json).result }}
+              logs: {{ (context | from_json).logs }}
+    - alias: Warning logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level in ['debug', 'warning'] }}
+      then:
+        - service: system_log.write
+          data:
+            level: warning
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [WARNING]:
+              result data: {{ (context | from_json).result }}
+              logs: {{ (context | from_json).logs }}
+    - alias: Debug logging
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.automation.logger_level == 'debug' }}
+      then:
+        - service: system_log.write
+          data:
+            level: warning
+            logger: "{{ automation_logger_name }}"
+            message: >
+              [DEBUG]:
+              snapshot: {{ snapshot }}
+              context: {{ context | from_json }}
+
+  - alias: EMHASS Basic Automation run save
     if:
-      - condition: trigger
-        id:
-          - save
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {{ config.automation.save_enabled | default(true) | bool }}
     then:
       - action: !input emhass_rest_name
         data:
@@ -1396,15 +1621,17 @@ actions:
           host: !input emhass_host
           port: !input emhass_port
           api: !input emhass_api_save
-          payload: "{{ payload_save }}"
+          payload: >
+            {% set config = context | from_json %}
+            {{ config.result.save | to_json }}
         response_variable: response_publish_save
 
-  # --- Run forecast (ML)
-  - alias: Run emhass forecast
+  - alias: EMHASS Basic Automation run forecast
     if:
-      - condition: trigger
-        id:
-          - forecast
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {{ config.automation.forecast_enabled | default(true) | bool }}
     then:
       - action: !input emhass_rest_name
         data:
@@ -1412,11 +1639,57 @@ actions:
           host: !input emhass_host
           port: !input emhass_port
           api: !input emhass_api_ml
-          payload: "{{ payload_forecast }}"
+          payload: >
+            {% set config = context | from_json %}
+            {{ config.result.forecast | to_json }}
         response_variable: response_publish_forecast
+
+  - alias: EMHASS Basic Automation run optim
+    if:
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {{ config.automation.optim_enabled | default(true) | bool }}
+    then:
+      - action: !input emhass_rest_name
+        data:
+          protocol: !input emhass_protocol
+          host: !input emhass_host
+          port: !input emhass_port
+          api: !input emhass_api_optim
+          payload: >
+            {% set config = context | from_json %}
+            {{ config.result.optim | to_json }}
+        response_variable: response_payload_optim
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 5
+          milliseconds: 0
+
+  - alias: EMHASS Basic Automation run publish
+    if:
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {{ config.automation.publish_enabled | default(true) | bool }}
+    then:
+      - action: !input emhass_rest_name
+        data:
+          protocol: !input emhass_protocol
+          host: !input emhass_host
+          port: !input emhass_port
+          api: !input emhass_api_publish
+          payload: >
+            {% set config = context | from_json %}
+            {{ config.result.publish | to_json }}
+        response_variable: response_payload_publish
 
 # -------------------
 # --- Automation Mode
 # -------------------
 
 mode: single
+max_exceeded: silent
+trace:
+  stored_traces: !input automation_trace_count

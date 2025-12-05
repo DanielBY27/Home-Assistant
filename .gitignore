@@ -1,5 +1,6 @@
 # Git Ignore
-prompt.txt
+/prompt.txt
+/emhass_config.json
 *.log
 *.sqlite
 *.sqlite-wal

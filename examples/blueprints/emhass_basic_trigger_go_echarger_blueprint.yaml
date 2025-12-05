@@ -40,7 +40,7 @@ use_blueprint:
       {% set min_timesteps_needed = (power_needed / nominal_power_w * 4) |
       round(0, 'ceil') | int %}
 
-      {% set target_times_h_m_s = ["13:00:00", "18:00:00", "05:00:00"] %}
+      {% set target_times_h_m_s = ["13:00:00", "17:00:00", "03:00:00"] %}
 
       {# -------------------- TEST-BEREICH START -------------------- #}
 
@@ -98,7 +98,7 @@ use_blueprint:
       {% endif %}
     allow_allways_to_done: true
     goe_pluged_binary_sensor: binary_sensor.goe_297534_car_0
-    goe_default_mode_sensor: input_select.wallbox_load_strategy
     goe_power_number_sensor: number.goe_297534_amp
     goe_allow_charging_select: select.goe_297534_frc
     emhass_config_optimization_time_step: "15"
+    automation_logger_level: INFO

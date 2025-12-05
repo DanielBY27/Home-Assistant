@@ -21,3 +21,4 @@ use_blueprint:
     deferrable_load_single_constant: true
     notify_done: Geschirrspüler ist fertig!
     emhass_config_optimization_time_step: "15"
+    automation_logger_level: INFO

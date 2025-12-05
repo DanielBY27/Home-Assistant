@@ -1,16 +1,36 @@
 alias: HA Datenbank Purge
-description: ""
+description: |
+  -- Check the Home-Assistant Database over the `SQLite Web` plugin
+  ```
+  SELECT
+    COUNT(s.state_id) AS "Anzahl_der_Eintraege",
+    sm.entity_id AS "Entitaet",
+    -- Schätzung des Verbrauchs in MB (256 Byte pro Zeile)
+    ROUND(((COUNT(s.state_id) * 256.0) / 1024.0 / 1024.0), 2) AS "Geschaetzter_Verbrauch_MB"
+  FROM states s LEFT JOIN states_meta sm ON s.metadata_id = sm.metadata_id GROUP
+  BY sm.entity_id ORDER BY Anzahl_der_Eintraege DESC LIMIT 20;
+  ```
+  Used in EMHASS:
+  - `sensor.scb_solar_power`
+  - `sensor.emhass_config_home_power_no_var_loads`
 triggers:
   - trigger: time
     at: "23:00:00"
     weekday:
       - sun
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+    id: daily
 conditions: []
 actions:
   - action: recorder.purge_entities
     metadata: {}
     data:
-      keep_days: 1
+      keep_days: 3
       domains:
         - sun
         - weather
@@ -20,7 +40,10 @@ actions:
         - input_text
         - input_boolean
         - automation
+        - media_player
       entity_id:
+        - sensor.scbhomepowerfromgrid10
+        - sensor.scbbatterysoc10
         - sensor.geschirrspulerstatistik10
         - sensor.waschmaschinestatistik10
         - sensor.waschetrocknerstatistik10
