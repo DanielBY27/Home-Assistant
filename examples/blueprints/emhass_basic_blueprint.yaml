@@ -3,7 +3,29 @@ description: ""
 use_blueprint:
   path: emhass_basic.yaml
   input:
-    emhass_config_load_cost_forecast: "0.3"
+    emhass_config_load_cost_forecast: >-
+      {% set tibber_list = state_attr('sensor.tibber_rohdaten_cache',
+      'price_data') %}
+
+      {% set tibber_avg = state_attr('sensor.tibber27a_strompreis', 'avg_price')
+      | default(0.35) | float %}
+
+      {% set tibber_avg_list = [tibber_avg] * 96 %}
+
+      {% set now = now() %}
+
+      {% if tibber_list is not none %}
+        {% set ns = namespace(data=[]) %}
+        {% for item in tibber_list %}
+          {% if as_datetime(item.start_time) >= now %}
+            {% set ns.data = ns.data + [item.price | default(0) | float] %}
+          {% endif %}
+        {% endfor %}
+        {% set combined_forecast = ns.data + tibber_avg_list %}
+        {{ combined_forecast[:96] }}
+      {% else %}
+        {{ ([tibber_avg] * 96) }}
+      {% endif %}
     emhass_config_p_pv_forecast: >-
       {% set today = state_attr('sensor.solcast_pv_forecast_prognose_heute',
       'detailedForecast') %}
