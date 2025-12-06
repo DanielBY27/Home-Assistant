@@ -1,0 +1,92 @@
+alias: Kostal min SoC Controller
+description: ""
+triggers:
+  - trigger: state
+    entity_id:
+      - number.scb_battery_min_soc
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 20
+    to:
+      - "10"
+  - trigger: numeric_state
+    entity_id:
+      - number.scb_battery_min_soc
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 20
+    below: sensor.emhass_pv_battery_load_from_grid_in
+  - trigger: state
+    entity_id:
+      - input_select.pv_battery_emhass_status
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 20
+  - trigger: state
+    entity_id:
+      - input_select.wallbox_emhass_status
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 20
+conditions: []
+actions:
+  - if:
+      - condition: template
+        value_template: >
+          {% set scb_soc = states('number.scb_battery_min_soc') | default(10) |
+          int %}
+
+          {% set pv_bat = states('sensor.emhass_pv_battery_load_from_grid_in') |
+          default(10) | int %}
+
+          {{ scb_soc <= pv_bat }}
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: input_select.wallbox_emhass_status
+            state:
+              - running
+              - force
+              - force-6
+              - force-10
+              - force-12
+              - force-14
+              - force-16
+          - condition: state
+            entity_id: input_select.pv_battery_emhass_status
+            state:
+              - running
+              - force
+    then:
+      - variables:
+          newMinSoc: >
+            {% set source_soc = states('number.scb_battery_min_soc') |
+            default(10) | int %}  {% set soc_value =
+            states('sensor.scb_battery_soc') | default(10) | int %} {% set
+            source_sensor = states('sensor.emhass_pv_battery_load_from_grid_in')
+            | default(10) | int %} {% set new_max = [source_soc, source_sensor]
+            | max | int %}  {% set new_value = [soc_value, new_max, 70] | min |
+            int %}  {% set calc_pct_round = ((new_value / 5) | round(0, 'ceil')
+            * 5) | int %} {% if source_soc >= calc_pct_round %}
+              {{ source_soc }}
+            {% else %}
+              {{ calc_pct_round }}
+            {% endif %}
+      - action: number.set_value
+        metadata: {}
+        target:
+          entity_id: number.scb_battery_min_soc
+        data:
+          value: "{{ newMinSoc }}"
+    else:
+      - action: number.set_value
+        metadata: {}
+        target:
+          entity_id: number.scb_battery_min_soc
+        data:
+          value: "10"
+mode: single
