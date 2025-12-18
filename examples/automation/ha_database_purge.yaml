@@ -48,7 +48,6 @@ actions:
         - sensor.waschmaschinestatistik10
         - sensor.waschetrocknerstatistik10
         - sensor.emhass_battery_grid_import
-        - sensor.energy_config_good_day_calculator
         - sensor.family_group_count_present
         - sensor.emhass_go_echarger_trigger
         - sensor.emhass_go_echarger_power

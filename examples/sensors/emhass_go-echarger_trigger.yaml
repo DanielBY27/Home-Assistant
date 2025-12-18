@@ -6,7 +6,7 @@
     state: >
       {% set target_soc_pct = 95 %}
       {% set batt_capacity_wh = 50000 %}
-      {% set efficiency_factor = 0.98 %}
+      {% set efficiency_factor = 0.96 %}
       {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') | bool %}
       {% set goe_loaded_wh = (states('sensor.goe_297534_wh') | float(0)) * 1000 %}
       {% set emhass_data = states('input_text.wallbox_emhass_json') | from_json %}

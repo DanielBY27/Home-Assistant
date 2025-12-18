@@ -105,7 +105,7 @@ use_blueprint:
     forecast_timer_minutes: "38"
     enable_publish_timer: true
     emhass_config_optimization_time_step: "15"
-    emhass_config_historic_days_to_retrieve: 30
+    emhass_config_historic_days_to_retrieve: 48
     emhass_config_mlforecaster_payload_overwrite: >-
       {"split_date_delta": "96h", "kwargs": {"n_neighbors": 15, "leaf_size": 29,
       "weights": "distance"}}

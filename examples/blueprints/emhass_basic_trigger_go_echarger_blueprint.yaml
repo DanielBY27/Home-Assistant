@@ -15,12 +15,17 @@ use_blueprint:
       {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
       float(0) %}
 
-      {% set double_hours_needed = ((power_needed / nominal_power_w) * 2) |
-      round(0) %}
+      {% set raw_hours = power_needed / nominal_power_w %}
 
-      {% set hours_needed = double_hours_needed / 2 %}
+      {% set quarter_hours_needed = (raw_hours * 4) | round(0, 'ceil') %}
 
-      {{ [hours_needed, 0.5] | max | round(2) }}
+      {% set hours_needed = quarter_hours_needed / 4 %}
+
+      {% if power_needed > 0 %}
+        {{ [hours_needed, 0.25] | max }}
+      {% else %}
+        0
+      {% endif %}
     start_timesteps: 0
     end_timesteps: >-
       {# Wir rechnen nicht mit 11kW sondern lassen EMHASS luft um die beste Zeit

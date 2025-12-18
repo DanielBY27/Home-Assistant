@@ -22,3 +22,4 @@ use_blueprint:
     notify_done: Geschirrspüler ist fertig!
     emhass_config_optimization_time_step: "15"
     automation_logger_level: INFO
+    running_stabilize_sensors_delay: 6
