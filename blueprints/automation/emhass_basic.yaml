@@ -1177,7 +1177,7 @@ variables:
       {# --- Power Sensor Logik --- #}
       {% set emhass_sensor = 'sensor.p_deferrable' ~ loop.index0 %}
       {% set emhass_sensor_attribute_name = (emhass_sensor | string).split('.')[-1] %}
-      {% set current_power_val = states(emhass_sensor) | default(0) | int %}
+      {% set current_power_val = states(emhass_sensor) | default(0) | int(0) %}
       {% set ns.power_current = ns.power_current + [current_power_val] %}
 
       {# --- Schedule Analyse --- #}
