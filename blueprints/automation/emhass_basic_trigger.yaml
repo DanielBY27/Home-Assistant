@@ -585,6 +585,20 @@ conditions:
         has_value((snapshot | from_json).trigger_sensor_name)
       }}
 
+  - condition: template
+    value_template: >
+      {% set config = snapshot | from_json %}
+      {% set automation_trigger_id = trigger.id | default('none') | string | lower %}
+      {% set is_user_action = config.status_sensor_changed_by_user == true and
+        as_timestamp(config.current_time) - as_timestamp(config.status_sensor_changed) < 10 %}
+      {% if is_user_action == true and automation_trigger_id == 'input_state_changed' %}
+        {{ true }}
+      {% elif is_user_action == false and automation_trigger_id != 'input_state_changed' %}
+        {{ true }}
+      {% else %}
+        {{ false }}
+      {% endif %}
+
 # --------------------------
 # --- EMHASS Trigger Actions
 # --------------------------
@@ -631,88 +645,84 @@ actions:
             {% set res.log_msg = res.log_msg + ['User switched to unknow state: ' ~ config.status_sensor_value] %}
           {% endif %}
         {% else %}
-          {% if automation_trigger_id == 'input_state_changed' %}
-            {% set res.log_msg = res.log_msg + ['Trigger id input_state_changed are not allowed (only for user action)'] %}
-          {% else %}
-            {% if
-                config.wait_sensor_value > config.wait_sensor_threshold and
-                config.emhass_us == 'done' and
-                config.automation_ho >= config.emhass_step_value_hour and
-                config.trigger_strategy_value in ['1', '3', '5']
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1000)'] %}
-              {% set res.automation_action = 'wait' %}
-            {% elif
-                automation_trigger_id == 'cron' and
-                config.emhass_us == 'done' and
-                config.automation_ho >= config.emhass_step_value_hour and
-                config.trigger_strategy_value in ['2', '4', '6']
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1010)'] %}
-              {% set res.automation_action = 'wait' %}
-            {% elif
-                config.emhass_us in ['running', 'wait'] and
-                config.emhass_deferrable_power_open > 0 and
-                config.trigger_sensor_value == 0 and
-                config.automation_si == false and
-                config.automation_si_work == true
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1020)'] %}
-              {% set res.automation_action = 'wait' %}
-            {% elif
-              (config.emhass_us == 'force' or ((config.emhass_us).startswith('force-'))) and
-              config.stop_sensor_value >= config.stop_sensor_threshold and
+          {% if
+              config.wait_sensor_value > config.wait_sensor_threshold and
+              config.emhass_us == 'done' and
+              config.automation_ho >= config.emhass_step_value_hour and
+              config.trigger_strategy_value in ['1', '3', '5']
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1000)'] %}
+            {% set res.automation_action = 'wait' %}
+          {% elif
+              automation_trigger_id == 'cron' and
+              config.emhass_us == 'done' and
+              config.automation_ho >= config.emhass_step_value_hour and
+              config.trigger_strategy_value in ['2', '4', '6']
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1010)'] %}
+            {% set res.automation_action = 'wait' %}
+          {% elif
+              config.emhass_us in ['running', 'wait'] and
+              config.emhass_deferrable_power_open > 0 and
+              config.trigger_sensor_value == 0 and
+              config.automation_si == false and
+              config.automation_si_work == true
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1020)'] %}
+            {% set res.automation_action = 'wait' %}
+          {% elif
+            (config.emhass_us == 'force' or ((config.emhass_us).startswith('force-'))) and
+            config.stop_sensor_value >= config.stop_sensor_threshold and
+            (
+              (config.status_sensor_value in ['wait', 'running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+              config.trigger_sensor_value > 0
+            )
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state force running by emhass sensor (1100)'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif
+            config.emhass_us == 'wait' and
+            (
               (
-                (config.status_sensor_value in ['wait', 'running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+                config.stop_sensor_value >= config.stop_sensor_threshold and
+                config.status_sensor_value == 'wait'
+              ) or (
                 config.trigger_sensor_value > 0
               )
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state force running by emhass sensor (1100)'] %}
-              {% set res.automation_action = 'running' %}
-            {% elif
-              config.emhass_us == 'wait' and
-              (
-                (
-                  config.stop_sensor_value >= config.stop_sensor_threshold and
-                  config.status_sensor_value == 'wait'
-                ) or (
-                  config.trigger_sensor_value > 0
-                )
-              )
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1110)'] %}
-              {% set res.automation_action = 'running' %}
-            {% elif
-              (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
-              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) and
-              config.wait_sensor_value > config.wait_sensor_threshold and
-              config.trigger_sensor_value > 0
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1120)'] %}
-              {% set res.automation_action = 'running' %}
-            {% elif
-              config.stop_sensor_value < config.stop_sensor_threshold and
-              config.trigger_strategy_value in ['1', '2', '5', '6'] and
-              (
-                (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
-                config.allow_allways_to_done_value == true
-              )
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state done by stop sensor (1200)'] %}
-              {% set res.automation_action = 'done' %}
-            {% elif
-              config.trigger_sensor_value == 0 and
-              config.trigger_strategy_value in ['3', '4', '5', '6'] and
-              (
-                (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
-                config.allow_allways_to_done_value == true
-              )
-            %}
-              {% set res.log_msg = res.log_msg + ['Automation switched to state done by emhass sensor (1210)'] %}
-              {% set res.automation_action = 'done' %}
-            {% else %}
-              {% set res.log_msg = res.log_msg + ['Can not switch to new state. No state found. (1300)'] %}
-            {% endif %}
+            )
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1110)'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif
+            (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
+            (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) and
+            config.wait_sensor_value > config.wait_sensor_threshold and
+            config.trigger_sensor_value > 0
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1120)'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif
+            config.stop_sensor_value < config.stop_sensor_threshold and
+            config.trigger_strategy_value in ['1', '2', '5', '6'] and
+            (
+              (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+              config.allow_allways_to_done_value == true
+            )
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state done by stop sensor (1200)'] %}
+            {% set res.automation_action = 'done' %}
+          {% elif
+            config.trigger_sensor_value == 0 and
+            config.trigger_strategy_value in ['3', '4', '5', '6'] and
+            (
+              (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+              config.allow_allways_to_done_value == true
+            )
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation switched to state done by emhass sensor (1210)'] %}
+            {% set res.automation_action = 'done' %}
+          {% else %}
+            {% set res.log_msg = res.log_msg + ['Can not switch to new state. No state found. (1300)'] %}
           {% endif %}
         {% endif %}
 
