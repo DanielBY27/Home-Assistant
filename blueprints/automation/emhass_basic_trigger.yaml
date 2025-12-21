@@ -797,15 +797,16 @@ actions:
 
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
         {# --- A new calculation can only be generated via the status 'done' -> 'wait' --- #}
+        {% set json_override_allowed = (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') or (config.emhass_deferrable_power_open == 0) %}
         {% set result_target_json = {
-            'po': res.new_po if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_po,
-            'ho': res.new_ho if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_ho,
-            'st': res.new_st if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_st,
-            'et': res.new_et if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_et,
-            'se': res.new_se if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_se,
-            'si': res.new_si if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_si,
-            'mp': res.new_mp if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_mp,
-            'pe': res.new_pe if (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') else config.emhass_pe,
+            'po': res.new_po if json_override_allowed else config.emhass_po,
+            'ho': res.new_ho if json_override_allowed else config.emhass_ho,
+            'st': res.new_st if json_override_allowed else config.emhass_st,
+            'et': res.new_et if json_override_allowed else config.emhass_et,
+            'se': res.new_se if json_override_allowed else config.emhass_se,
+            'si': res.new_si if json_override_allowed else config.emhass_si,
+            'mp': res.new_mp if json_override_allowed else config.emhass_mp,
+            'pe': res.new_pe if json_override_allowed else config.emhass_pe,
             'us': res.new_us,
             'ss': res.new_ss
           }
