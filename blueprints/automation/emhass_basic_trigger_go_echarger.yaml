@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller for go-echarger (v202512)
+  name: EMHASS Deferrable Load Controller for go-echarger (v202512_1)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -179,6 +179,17 @@ blueprint:
           default: false
           selector:
             boolean:
+        running_stabilize_sensors_delay:
+          name: Delay to stabilize the 'running' sensors
+          description: >
+            This value delays the automation's termination by x minutes when the status changes to `running` or `force`. This is primarily needed in `force` mode to stabilize the sensors (defaut = 0).
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1
+              mode: box
         stop_sensor:
           name: Sensor for 'Done' Status
           description: >
@@ -427,7 +438,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202512
+  blueprint_version: v202512_1
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -444,6 +455,7 @@ variables:
   input_wait_sensor: !input wait_sensor
   input_wait_value: !input wait_value
   input_skipp_wait_to_force: !input skipp_wait_to_force
+  input_running_stabilize_sensors_delay: !input running_stabilize_sensors_delay
   input_wait_times_hours: !input wait_times_hours
   input_wait_times_minutes: !input wait_times_minutes
   input_stop_sensor: !input stop_sensor
@@ -504,6 +516,7 @@ variables:
       "wait_sensor_value": states(input_wait_sensor | string) | default(0) | float,
       "wait_sensor_threshold": input_wait_value | default(1) | int,
       "skipp_wait_to_force_value": input_skipp_wait_to_force | default(false) | bool,
+      "running_stabilize_sensors_delay": input_running_stabilize_sensors_delay | default(0) | int(0),
       "wait_times_hours_value": input_wait_times_hours | default('0') | string,
       "wait_times_minutes_value": input_wait_times_minutes | default('5') | string,
       "stop_sensor_name": input_stop_sensor | string,
@@ -687,7 +700,7 @@ actions:
           new_st = config.automation_st, new_et = config.automation_et,
           new_se = config.automation_se, new_si = config.automation_si,
           new_mp = config.automation_mp, new_pe = config.automation_pe,
-          new_us = 'none', new_ss = config.emhass_ss,
+          new_us = 'none', new_ss = config.emhass_ss, new_running_sensors_delay = 0,
           notify_enabled = false, notify_message = '',
           goe_power = config.goe_power_number_sensor_value,
           goe_charging = config.goe_allow_charging_select_value,
@@ -818,6 +831,7 @@ actions:
         {# --- Got to running (force) --- #}
         {% elif res.automation_action == 'running' %}
           {% set res.log_msg = res.log_msg + ['Go to status running'] %}
+          {% set res.new_running_sensors_delay = config.running_stabilize_sensors_delay %}
           {% if
               (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
               (
@@ -1150,6 +1164,15 @@ actions:
             {{ config.result.goe.power | int }}
         target:
           entity_id: !input goe_power_number_sensor
+
+  - alias: Wait for running sensor delay
+    delay:
+      hours: 0
+      minutes: >
+        {% set config = context | from_json %}
+        {{ config.automation.running_sensors_delay | default(0) | int(0) }}
+      seconds: 0
+      milliseconds: 1
 
 # -------------------
 # --- Automation Mode
