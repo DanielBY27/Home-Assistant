@@ -7,7 +7,7 @@ triggers:
     for:
       hours: 0
       minutes: 0
-      seconds: 20
+      seconds: 5
     to:
       - "10"
   - trigger: numeric_state
@@ -16,22 +16,30 @@ triggers:
     for:
       hours: 0
       minutes: 0
-      seconds: 20
+      seconds: 10
     below: sensor.emhass_pv_battery_load_from_grid_in
+  - trigger: numeric_state
+    entity_id:
+      - number.scb_battery_min_soc
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+    above: sensor.emhass_pv_battery_load_from_grid_in
   - trigger: state
     entity_id:
       - input_select.pv_battery_emhass_status
     for:
       hours: 0
       minutes: 0
-      seconds: 20
+      seconds: 5
   - trigger: state
     entity_id:
       - input_select.wallbox_emhass_status
     for:
       hours: 0
       minutes: 0
-      seconds: 20
+      seconds: 5
 conditions: []
 actions:
   - if:
@@ -89,4 +97,4 @@ actions:
           entity_id: number.scb_battery_min_soc
         data:
           value: "10"
-mode: single
+mode: restart

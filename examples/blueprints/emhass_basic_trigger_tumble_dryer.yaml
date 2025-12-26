@@ -10,9 +10,9 @@ use_blueprint:
     wait_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
     wait_value: 500
     stop_sensor: sensor.waschetrocknerstatistik10
-    stop_value: 5
+    stop_value: 20
     nominal_powers: 1600
-    operating_hours: "1.75"
+    operating_hours: "2"
     start_timesteps: 0
     end_timesteps: "20"
     minimum_power_deferrable_load: 400

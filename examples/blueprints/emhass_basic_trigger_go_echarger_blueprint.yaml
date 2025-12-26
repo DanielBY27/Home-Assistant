@@ -45,7 +45,7 @@ use_blueprint:
       {% set min_timesteps_needed = (power_needed / nominal_power_w * 4) |
       round(0, 'ceil') | int %}
 
-      {% set target_times_h_m_s = ["13:00:00", "17:00:00", "03:00:00"] %}
+      {% set target_times_h_m_s = ["13:00:00", "17:00:00", "05:00:00"] %}
 
       {# -------------------- TEST-BEREICH START -------------------- #}
 
@@ -87,9 +87,9 @@ use_blueprint:
     deferrable_startup_penalty: 2
     notify_group: parents_mobile_phones
     wait_sensor: sensor.emhass_go_echarger_trigger
-    wait_value: 1
+    wait_value: 500
     stop_sensor: sensor.emhass_go_echarger_trigger
-    stop_value: 1
+    stop_value: 10
     deferrable_load_as_semi_cont: false
     deferrable_load_single_constant: false
     deferrable_load_single_constant_work: >-

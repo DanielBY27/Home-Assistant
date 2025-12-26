@@ -41,17 +41,20 @@ actions:
         - input_boolean
         - automation
         - media_player
+        - device_tracker
+        - person
+        - event
       entity_id:
-        - sensor.scbhomepowerfromgrid10
-        - sensor.scbbatterysoc10
         - sensor.geschirrspulerstatistik10
         - sensor.waschmaschinestatistik10
         - sensor.waschetrocknerstatistik10
         - sensor.emhass_battery_grid_import
         - sensor.family_group_count_present
         - sensor.emhass_go_echarger_trigger
-        - sensor.emhass_go_echarger_power
         - sensor.kostal_load_from_gid_modbus
+        - sensor.pv1_energy_hour
+        - sensor.pv2_energy_hour
+        - sensor.pv3_energy_hour
       entity_globs:
         - sensor.goe_297534_*
         - sensor.l201_eea_*
@@ -108,4 +111,8 @@ actions:
           repack: true
           apply_filter: true
           keep_days: 70
+  - action: shell_command.delete_old_nest_images
+    metadata: {}
+    data: {}
+    response_variable: DeleteNestImages
 mode: single

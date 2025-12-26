@@ -8,7 +8,7 @@ use_blueprint:
       'price_data') %}
 
       {% set tibber_avg = state_attr('sensor.tibber27a_strompreis', 'avg_price')
-      | default(0.35) | float %}
+      | default(0.35) | float(0.35) %}
 
       {% set tibber_avg_list = [tibber_avg] * 96 %}
 

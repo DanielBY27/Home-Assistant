@@ -26,12 +26,12 @@ use_blueprint:
       step_hours %} {% set final_steps = needed_steps | round(0, 'ceil') %} {%
       set final_duration_hours = final_steps * step_hours %} {{ [0,
       final_duration_hours] | max | round(2) }}
-    wait_times_hours: "21"
+    wait_times_hours: "22"
     wait_times_minutes: "0"
     update_sensor: number.scb_battery_min_soc
     nominal_powers: 4000
     start_timesteps: 0
-    end_timesteps: "32"
+    end_timesteps: "28"
     deferrable_load_as_semi_cont: true
     deferrable_load_single_constant: false
     minimum_power_deferrable_load: 4000
