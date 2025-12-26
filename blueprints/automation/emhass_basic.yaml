@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Basic Automation Controller (v202512)
+  name: EMHASS Basic Automation Controller (v202601)
   description: |
     This blueprint acts as the central controller for the EMHASS (Energy Management Optimization for Home Assistant) integration.
     It is the **only** automation that should communicate directly with the EMHASS add-on.
@@ -492,24 +492,6 @@ blueprint:
           default: false
           selector:
             boolean:
-        emhass_config_lp_solver:
-          name: lp_solver
-          description: >
-            The linear programming solver to use. 'default' uses the built-in solver.
-          default: default
-          selector:
-            select:
-              options:
-                - default
-        emhass_config_lp_solver_path:
-          name: lp_solver_path
-          description: >
-            Path to an external solver (if not using 'default').
-          default: empty
-          selector:
-            select:
-              options:
-                - empty
         emhass_config_num_threads:
           name: num_threads
           description: >
@@ -976,7 +958,7 @@ blueprint:
 # --------------------
 
 variables:
-  blueprint_version: v202512
+  blueprint_version: v202601
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -1039,8 +1021,6 @@ variables:
   emhass_config_inverter_efficiency_dc_ac: !input emhass_config_inverter_efficiency_dc_ac
   emhass_config_inverter_is_hybrid: !input emhass_config_inverter_is_hybrid
   emhass_config_logging_level: !input emhass_config_logging_level
-  emhass_config_lp_solver: !input emhass_config_lp_solver
-  emhass_config_lp_solver_path: !input emhass_config_lp_solver_path
   emhass_config_lp_solver_timeout: !input emhass_config_lp_solver_timeout
   emhass_config_maximum_power_from_grid: !input emhass_config_maximum_power_from_grid
   emhass_config_maximum_power_to_grid: !input emhass_config_maximum_power_to_grid
@@ -1496,8 +1476,6 @@ actions:
               'inverter_efficiency_dc_ac': emhass_config_inverter_efficiency_dc_ac,
               'inverter_is_hybrid': emhass_config_inverter_is_hybrid,
               'logging_level': emhass_config_logging_level,
-              'lp_solver': emhass_config_lp_solver,
-              'lp_solver_path': emhass_config_lp_solver_path,
               'lp_solver_timeout': emhass_config_lp_solver_timeout,
               'maximum_power_from_grid': emhass_config_maximum_power_from_grid,
               'maximum_power_to_grid': emhass_config_maximum_power_to_grid,
@@ -1521,7 +1499,7 @@ actions:
               'photovoltaic_production_sell_price': emhass_config_photovoltaic_production_sell_price,
               'sensor_power_load_no_var_loads': emhass_config_sensor_power_load_no_var_loads,
               'sensor_power_photovoltaics': emhass_config_sensor_power_photovoltaics,
-              'sensor_replace_zero': [ emhass_config_sensor_power_photovoltaics | string ],
+              'sensor_replace_zero': [ (emhass_config_sensor_power_photovoltaics | string), (emhass_config_sensor_power_load_no_var_loads | string) ],
               'strings_per_inverter': emhass_config_strings_per_inverter | from_json,
               'surface_azimuth': emhass_config_surface_azimuth | from_json,
               'surface_tilt': emhass_config_surface_tilt | from_json,

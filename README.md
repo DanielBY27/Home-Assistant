@@ -92,6 +92,7 @@ For the blueprints to communicate with the EMHASS add-on, you must add the follo
 rest_command:
   emhass_rest_command:
     url: '{{ protocol }}://{{ host }}:{{ port }}/{{ api }}'
+    timeout: 59
     method: POST
     content_type: 'application/json'
     payload: '{{ payload }}'
