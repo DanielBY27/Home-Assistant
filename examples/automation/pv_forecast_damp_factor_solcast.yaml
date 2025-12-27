@@ -1,0 +1,61 @@
+alias: PV forecast damp_factor (Solcast)
+description: ""
+triggers:
+  - trigger: time
+    at: "03:00:00"
+conditions: []
+actions:
+  - variables:
+      damp_factor_string: |-
+        {% set overrides = {
+          "1": {
+            "12": 0.96,
+            "13": 0.5,
+            "14": 0.17,
+            "15": 0.15,
+            "16": 0.25,
+            "17": 0.1,
+            "18": 0.1,
+            "19": 0.1,
+            "20": 0.1
+          },
+          "2": {
+            "13": 0.96,
+            "14": 0.5,
+            "15": 0.17,
+            "16": 0.25,
+            "17": 0.25,
+            "18": 0.1,
+            "19": 0.1,
+            "20": 0.1
+          },
+          "12": {
+            "11": 0.96,
+            "12": 0.5,
+            "13": 0.13,
+            "14": 0.14,
+            "15": 0.17,
+            "16": 0.1,
+            "17": 0.1,
+            "18": 0.1,
+            "19": 0.1,
+            "20": 0.1
+          }
+        } %}
+
+        {% set month = now().month | string %}
+        {% set ns = namespace(factors=[]) %}
+        {% for hour in range(24) %}
+          {% set tmp_hour = hour | string %}
+          {% set val = 1.0 %}
+          {% if month in overrides.keys() and tmp_hour in overrides[month].keys() %}
+            {% set val = overrides[month][tmp_hour] %}
+          {% endif %}
+          {% set ns.factors = ns.factors + [val] %}
+        {% endfor %}
+        {{ ns.factors | join(',') }}
+  - action: solcast_solar.set_dampening
+    metadata: {}
+    data:
+      damp_factor: "{{ damp_factor_string }}"
+mode: single
