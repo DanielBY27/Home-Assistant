@@ -1,0 +1,31 @@
+alias: Living Room
+description: ""
+use_blueprint:
+  path: room_control.yaml
+  input:
+    present_entity:
+      - person.daniel
+      - person.tanja
+      - person.lukas
+      - person.simon
+    window_entity:
+      - binary_sensor.wohnzimmer_fenster_hof
+      - binary_sensor.terrassentur_2
+    blind_entity:
+      - cover.wohnzimmer_rolladen_hof
+      - cover.hmip_broll_2_0036a269a0b6ee
+    heating_entity:
+      - climate.wohnzimmer_antrieb_hof
+      - climate.wohnzimmer_antrieb_garten
+    blind_allow_opening_at_home: true
+    blind_open_earliest: "06:30:00"
+    blind_open_offset_time:
+      hours: 0
+      minutes: 0
+      seconds: 0
+    blind_close_offset_time:
+      hours: 0
+      minutes: 20
+      seconds: 0
+    blind_close_latest: "21:30:00"
+    blind_setup: default,vent_disabled

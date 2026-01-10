@@ -1,0 +1,548 @@
+blueprint:
+  name: Room Control (v202601)
+  description: |
+    Comprehensive room control automation that manages heating and roller shutters based on presence, window status, and sun position.
+
+    **Key Features:**
+    * **Heating:** Automates Homematic radiator valves based on presence (Home/Away) and window status (Open).
+    * **Shading:** Controls blinds/shutters based on sunrise/sunset with configurable offsets and limits.
+    * **Ventilation:** Automatically adjusts blinds when windows are opened (configurable per blind).
+
+    **Requirements:**
+    * The [Homematic](https://www.home-assistant.io/integrations/homematic/) integration.
+    * Homematic radiator valves (e.g., `HmIP-eTRV-2`) configured with the following presets:
+        * `week_program_1`: Comfort temperature (Someone is home)
+        * `week_program_2`: Eco temperature (Nobody is home)
+        * `week_program_3`: Window open / Frost protection
+  domain: automation
+  source_url: https://github.com/DanielBY27/Home-Assistant/blob/main/blueprints/automation/room_control.yaml
+  author: DanielBY27
+  homeassistant:
+    min_version: 2025.10.0
+
+# ------------------------------
+# --- Room Control Trigger Input
+# ------------------------------
+
+  input:
+    present_config:
+      name: Presence Detection
+      description: Configuration for presence detection logic.
+      collapsed: true
+      input:
+        present_entity:
+          name: Person / Presence Sensors
+          description: Select person entities to determine if the room/home is occupied.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: person
+
+    window_config:
+      name: Window Sensors
+      description: Sensors to detect open windows or doors.
+      collapsed: true
+      input:
+        window_entity:
+          name: Window Entities
+          description: Select the binary sensors attached to your windows or doors.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: binary_sensor
+                device_class: [window, opening, door]
+
+    blind_config:
+      name: Shutter & Blind Control
+      description: Configuration for roller shutters, blinds, and day/night logic.
+      collapsed: true
+      input:
+        blind_entity:
+          name: Cover Entities
+          description: Select one or more covers to control.
+          default: []
+          selector:
+            entity:
+              domain: cover
+              device_class: shutter
+              multiple: true
+        blind_pos_open:
+          name: 'Target Position: Open'
+          description: 'Position when the blind is fully open (0-100%). Default: 100.'
+          default: 100
+          selector:
+            number: {min: 0, max: 100, mode: box}
+        blind_pos_close:
+          name: 'Target Position: Closed'
+          description: 'Position when the blind is fully closed (0-100%). Default: 0.'
+          default: 0
+          selector:
+            number: {min: 0, max: 100, mode: box}
+        blind_pos_vent:
+          name: 'Target Position: Ventilation'
+          description: 'Position to move to when the window is opened for ventilation (0-100%). Default: 25.'
+          default: 25
+          selector:
+            number: {min: 0, max: 100, mode: box}
+        blind_setup:
+           name: Ventilation Logic Mode
+           description: |
+            Define how blinds react to window opening. Enter a comma-separated list matching the order of the selected blinds (e.g., `default, vent_disabled`).
+            * `default`: Enable ventilation mode. Move to "Ventilation Position" when window opens; close when window closes (if currently night).
+            * `vent_disabled`: Disable ventilation. Force close the blind if the window is open (e.g., for privacy).
+            * `vent_disabled_open`: Manual mode. Do not move the blind automatically if the window is open.
+           default: 'default'
+           selector:
+             text: {}
+        blind_allow_opening_at_home:
+          name: Open Blinds When Present
+          description: If enabled, blinds will open in the morning even if someone is home.
+          default: false
+          selector:
+            boolean:
+        blind_open_earliest:
+          name: 'Morning: Earliest Opening Time'
+          description: The blinds will not open before this time, even if the sun has already risen.
+          default: '06:30:00'
+          selector:
+            time: {}
+        blind_open_offset_direction:
+          name: 'Morning: Sunrise Reference'
+          description: Calculate opening time before or after sunrise.
+          default: 'after'
+          selector:
+            select:
+              options:
+                - label: 'After Sunrise (+)'
+                  value: 'after'
+                - label: 'Before Sunrise (-)'
+                  value: 'before'
+        blind_open_offset_time:
+          name: 'Morning: Time Offset'
+          description: Time duration to add or subtract from sunrise.
+          default: '00:00:00'
+          selector:
+            duration: {}
+        blind_close_latest:
+          name: 'Evening: Latest Closing Time'
+          description: The blinds will force-close at this time, even if the sun is still up.
+          default: '22:00:00'
+          selector:
+            time: {}
+        blind_close_offset_direction:
+          name: 'Evening: Sunset Reference'
+          description: Calculate closing time before or after sunset.
+          default: 'after'
+          selector:
+            select:
+              options:
+                - label: 'After Sunset (+)'
+                  value: 'after'
+                - label: 'Before Sunset (-)'
+                  value: 'before'
+        blind_close_offset_time:
+          name: 'Evening: Time Offset'
+          description: Time duration to add or subtract from sunset.
+          default: '00:00:00'
+          selector:
+            duration: {}
+
+    heating_config:
+      name: Heating Control
+      description: Configuration for climate entities and active seasons.
+      collapsed: true
+      input:
+        heating_entity:
+          name: Thermostats
+          description: Select the climate entities (thermostats) to control.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              domain: climate
+        heating_month:
+          name: Active Heating Months
+          description: 'Comma-separated list of month numbers when heating logic is active (Default: Sept-April).'
+          default: '9, 10, 11, 12, 1, 2, 3, 4'
+          selector:
+            text: {}
+
+    trace_config:
+      name: Debugging
+      collapsed: true
+      input:
+        automation_trace_count:
+          name: Stored Traces
+          description: Number of automation traces to keep for debugging history.
+          default: 10
+          selector:
+            number: {min: 5, max: 50, mode: box}
+
+# ----------------------------------
+# --- Room Control Trigger Variables
+# ----------------------------------
+
+variables:
+  blueprint_version: v202601
+  automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
+  tmp_entity_window: !input window_entity
+  tmp_entity_presence: !input present_entity
+  tmp_entity_heating: !input heating_entity
+  tmp_entity_heating_month: !input heating_month
+  tmp_entity_blind: !input blind_entity
+  tmp_entity_blind_open: !input blind_pos_open
+  tmp_entity_blind_close: !input blind_pos_close
+  tmp_entity_blind_vent: !input blind_pos_vent
+  tmp_entity_blind_setup: !input blind_setup
+  tmp_entity_blind_open_earliest: !input blind_open_earliest
+  tmp_entity_blind_open_offset_direction: !input blind_open_offset_direction
+  tmp_entity_blind_open_offset_time: !input blind_open_offset_time
+  tmp_entity_blind_close_latest: !input blind_close_latest
+  tmp_entity_blind_close_offset_direction: !input blind_close_offset_direction
+  tmp_entity_blind_close_offset_time: !input blind_close_offset_time
+  tmp_entity_blind_allow_opening_at_home: !input blind_allow_opening_at_home
+
+# ---------------------------------
+# --- Room Control Trigger Triggers
+# ---------------------------------
+
+trigger_variables:
+  in_open_offset: !input blind_open_offset_time
+  in_open_dir: !input blind_open_offset_direction
+  in_open_earliest: !input blind_open_earliest
+  in_close_offset: !input blind_close_offset_time
+  in_close_dir: !input blind_close_offset_direction
+  in_close_latest: !input blind_close_latest
+
+triggers:
+  - trigger: template
+    id: "t_morning"
+    value_template: >
+      {% if in_open_offset is mapping %}
+        {% set sec = (in_open_offset.hours|default(0)|int * 3600) + (in_open_offset.minutes|default(0)|int * 60) + (in_open_offset.seconds|default(0)|int) %}
+      {% else %}
+        {% set t = (in_open_offset|string).split(':') %}
+        {% set sec = (t[0]|int * 3600) + (t[1]|int * 60) + (t[2]|int) %}
+      {% endif %}
+      {% set delta = timedelta(seconds = sec if in_open_dir == 'after' else -sec) %}
+      {% set next = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
+      {% set sun_today = next - timedelta(days=1) if next.day > now().day else next %}
+      {% set limit = today_at(in_open_earliest) %}
+      {{ now() >= [sun_today + delta, limit] | max }}
+  - trigger: template
+    id: "t_evening"
+    value_template: >
+      {% if in_close_offset is mapping %}
+        {% set sec = (in_close_offset.hours|default(0)|int * 3600) + (in_close_offset.minutes|default(0)|int * 60) + (in_close_offset.seconds|default(0)|int) %}
+      {% else %}
+        {% set t = (in_close_offset|string).split(':') %}
+        {% set sec = (t[0]|int * 3600) + (t[1]|int * 60) + (t[2]|int) %}
+      {% endif %}
+      {% set delta = timedelta(seconds = sec if in_close_dir == 'after' else -sec) %}
+      {% set next = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
+      {% set sun_today = next - timedelta(days=1) if next.day > now().day else next %}
+      {% set limit = today_at(in_close_latest) %}
+      {{ now() >= [sun_today + delta, limit] | min }}
+  - trigger: state
+    entity_id: !input window_entity
+    id: "t_window"
+    not_to:
+      - unknown
+      - unavailable
+    not_from:
+      - unknown
+      - unavailable
+  - trigger: state
+    entity_id: !input present_entity
+    id: "t_present"
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    to:
+      - home
+  - trigger: state
+    entity_id: !input present_entity
+    id: "t_present"
+    for:
+      hours: 0
+      minutes: 10
+      seconds: 0
+    to:
+      - not_home
+
+# -----------------------------------
+# --- Room Control Trigger Conditions
+# -----------------------------------
+
+conditions: []
+
+# --------------------------------
+# --- Room Control Trigger Actions
+# --------------------------------
+
+actions:
+
+  # --- CREATE SNAPSHOT (Current State) ---
+  - variables:
+      snapshot: >
+        {% set now_dt = now() %}
+        {% set current_month = now_dt.month | int %}
+        {% set heating_month = (tmp_entity_heating_month | default('9, 10, 11, 12, 1, 2, 3, 4') | string).split(',') | map('trim') | map('int') | list %}
+
+        {% set raw_o = tmp_entity_blind_open_offset_time %}
+        {% if raw_o is mapping %}
+          {% set sec_o = (raw_o.hours|default(0)|int * 3600) + (raw_o.minutes|default(0)|int * 60) + (raw_o.seconds|default(0)|int) %}
+        {% else %}
+          {% set t = (raw_o | string).split(':') %}
+          {% set sec_o = (t[0]|int * 3600) + (t[1]|int * 60) + (t[2]|int) %}
+        {% endif %}
+        {% set delta = timedelta(seconds = sec_o if tmp_entity_blind_open_offset_direction == 'after' else -sec_o) %}
+        {% set next = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
+        {% set sun_today = next - timedelta(days=1) if next.day > now().day else next %}
+        {% set limit = today_at(tmp_entity_blind_open_earliest) %}
+        {% set final_open = [sun_today + delta, limit] | max %}
+
+        {% set raw_c = tmp_entity_blind_close_offset_time %}
+        {% if raw_c is mapping %}
+          {% set sec_c = (raw_c.hours|default(0)|int * 3600) + (raw_c.minutes|default(0)|int * 60) + (raw_c.seconds|default(0)|int) %}
+        {% else %}
+          {% set t = (raw_c | string).split(':') %}
+          {% set sec_c = (t[0]|int * 3600) + (t[1]|int * 60) + (t[2]|int) %}
+        {% endif %}
+        {% set delta = timedelta(seconds = sec_c if tmp_entity_blind_close_offset_direction == 'after' else -sec_c) %}
+        {% set next = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
+        {% set sun_today = next - timedelta(days=1) if next.day > now().day else next %}
+        {% set limit = today_at(tmp_entity_blind_close_latest) %}
+        {% set final_close = [sun_today + delta, limit] | min %}
+
+        {% set snapshot_base = {
+          'current_time': now_dt | as_datetime | as_local | string,
+          'entity_window_ids': tmp_entity_window,
+          'entity_presence': tmp_entity_presence,
+          'entity_heating': tmp_entity_heating,
+          'entity_heating_month': heating_month,
+          'entity_heating_enabled': current_month in heating_month,
+          'entity_blind_ids': tmp_entity_blind,
+          'entity_blind_open': tmp_entity_blind_open | default(100) | int(100),
+          'entity_blind_close': tmp_entity_blind_close | default(0) | int(0),
+          'entity_blind_vent': tmp_entity_blind_vent | default(25) | int(25),
+          'entity_blind_open_earliest': tmp_entity_blind_open_earliest | default('06:30:00') | string,
+          'entity_blind_open_offset_direction': tmp_entity_blind_open_offset_direction | default('after') | string,
+          'entity_blind_open_offset_time': tmp_entity_blind_open_offset_time | default('00:00:00') | string,
+          'entity_blind_sun_open_time': final_open | string,
+          'entity_blind_close_latest': tmp_entity_blind_close_latest | default('22:00:00') | string,
+          'entity_blind_close_offset_direction': tmp_entity_blind_close_offset_direction | default('after') | string,
+          'entity_blind_close_offset_time': tmp_entity_blind_close_offset_time | default('00:00:00') | string,
+          'entity_blind_sun_close_time': final_close | string,
+          'entity_blind_is_day_phase': (final_open <= now_dt < final_close) | bool,
+          'entity_blind_allow_opening_at_home': tmp_entity_blind_allow_opening_at_home | bool,
+          'entity_blind_setup_raw': tmp_entity_blind_setup | default('default') | string
+        } %}
+
+        {% set ns = namespace(
+          window_states = [],
+          current_positions = [],
+          presence_list = [])
+        %}
+
+        {# Loop for Windows #}
+        {% for item in snapshot_base.entity_window_ids | default([]) %}
+          {% set ns.window_states = ns.window_states + [(states(item) == 'on')] %}
+        {% endfor %}
+        {% set window_is_open_global = true in ns.window_states %}
+
+        {# Loop for Blinds #}
+        {% for item in snapshot_base.entity_blind_ids | default([]) %}
+          {% set ns.current_positions = ns.current_positions + [(state_attr(item, 'current_position') | default(0) | int(0))] %}
+        {% endfor %}
+
+        {# Helper Loop for Presence #}
+        {% for item in snapshot_base.entity_presence | default([]) %}
+          {% set ns.presence_list = ns.presence_list + [(states(item) | default('home') | string)] %}
+        {% endfor %}
+        {% set presence_is_enabled = 'home' in ns.presence_list %}
+
+        {% set def = {
+          'window_states_list': ns.window_states,
+          'window_is_open_global': window_is_open_global,
+          'blind_current_pos_list': ns.current_positions,
+          'blind_count': (snapshot_base.entity_blind_ids | count | int(0)),
+          'entity_presence_list': ns.presence_list,
+          'entity_presence_is_enabled': presence_is_enabled
+        } %}
+        {{ (snapshot_base | combine(def)) | to_json }}
+
+  # --- CALCULATE LOGIC (Context) ---
+  - variables:
+      context: >
+        {% set config = snapshot | from_json %}
+        {% set automation_trigger_id = trigger.id | default('none') | string | lower %}
+
+        {# Namespace for Logic Calculation #}
+        {% set res = namespace(
+          heating_preset_mode = 'none',
+          blind_results = [],
+          log_msg = []
+        ) %}
+
+        {# --- Heating Logic --- #}
+        {% if config.window_is_open_global %}
+          {% set res.log_msg = res.log_msg + ['Heating set week_program_3 by trigger id ' ~ automation_trigger_id] %}
+          {% set res.heating_preset_mode = 'week_program_3' %}
+        {% elif config.entity_presence_is_enabled %}
+          {% set res.log_msg = res.log_msg + ['Heating set week_program_1 by trigger id ' ~ automation_trigger_id] %}
+          {% set res.heating_preset_mode = 'week_program_1' %}
+        {% else %}
+          {% set res.log_msg = res.log_msg + ['Heating set week_program_2 by trigger id ' ~ automation_trigger_id] %}
+          {% set res.heating_preset_mode = 'week_program_2' %}
+        {% endif %}
+
+        {# --- Blind Logic (State Machine) --- #}
+        {% set setup_list = config.entity_blind_setup_raw.split(',') | map('trim') | list %}
+        {% for i in range(config.blind_count) %}
+          {% set blind_entity = config.entity_blind_ids[i] %}
+          {% set current_pos = config.blind_current_pos_list[i] %}
+          {% set specific_window_open = config.window_states_list[i] if i < config.window_states_list|length else false %}
+          {% set specific_setup = setup_list[i] if i < setup_list|length else (setup_list[0] | default('default')) %}
+          {% set target = current_pos %}
+
+          {% if automation_trigger_id in ['t_morning', 't_present', 'none'] and
+              config.entity_blind_is_day_phase == true and
+              (
+                config.entity_blind_allow_opening_at_home == true or
+                config.entity_presence_is_enabled == false
+              )
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind open (100) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_open %}
+          {% elif automation_trigger_id in ['t_evening', 'none'] and
+              config.entity_blind_is_day_phase == false and
+              specific_window_open == false
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind close (200) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_close %}
+          {% elif automation_trigger_id in ['t_evening', 't_window', 'none'] and
+              config.entity_blind_is_day_phase == false and
+              specific_window_open == true and
+              specific_setup == 'default'
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind ventilation (300) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_vent %}
+          {% elif automation_trigger_id in ['t_evening', 'none'] and
+              config.entity_blind_is_day_phase == false and
+              specific_window_open == true and
+              specific_setup == 'vent_disabled'
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind close (210) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_close %}
+          {% elif automation_trigger_id in ['t_evening', 'none'] and
+              config.entity_blind_is_day_phase == false and
+              specific_window_open == true and
+              specific_setup == 'vent_disabled_open'
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind nothing config is vent_disabled_open (220) by trigger id ' ~ automation_trigger_id] %}
+          {% elif automation_trigger_id in ['t_window', 'none'] and
+              config.entity_blind_is_day_phase == false and
+              specific_window_open == false and
+              specific_setup == 'default'
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind close (220) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_close %}
+          {% else %}
+            {% set res.log_msg = res.log_msg + ['Blind nothing (999) by trigger id ' ~ automation_trigger_id] %}
+          {% endif %}
+
+          {% set res.blind_results = res.blind_results + [{
+            'entity_id': blind_entity,
+            'target_pos': target | int,
+            'current_pos': current_pos | int
+          }] %}
+        {% endfor %}
+
+        {# --- Final Output Construction --- #}
+        {{ {
+          'automation': {
+            'trigger_id': automation_trigger_id
+          },
+          'result': {
+            'heating_enabled': config.entity_heating_enabled,
+            'heating_preset_mode': res.heating_preset_mode,
+            'heating_hvac_mode': 'auto',
+            'is_day_phase': config.entity_blind_is_day_phase,
+            'blind_enabled':(config.blind_count > 0),
+            'blind_targets_list': res.blind_results
+          },
+          'logs': res.log_msg
+        } | to_json }}
+
+  # --- LOGGING (Optional) ---
+  - service: system_log.write
+    data:
+      level: info
+      logger: "{{ automation_logger_name }}"
+      message: >
+        [INFO]:
+        Snapshot: {{ snapshot }}
+        Context: {{ context | from_json }}
+
+  # --- EXECUTION ---
+  - alias: Run room settings
+    parallel:
+    - alias: Heating
+      if:
+        - condition: template
+          value_template: >
+            {% set config = context | from_json %}
+            {{ config.result.heating_enabled }}
+      then:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: !input heating_entity
+          data:
+            hvac_mode: >
+              {% set config = context | from_json %}
+              {{ config.result.heating_hvac_mode | default('auto') | string }}
+        - action: climate.set_preset_mode
+          target:
+            entity_id: !input heating_entity
+          data:
+            preset_mode: >
+              {% set config = context | from_json %}
+              {{ config.result.heating_preset_mode | default('week_program_2') | string }}
+
+    - alias: Blind Processing
+      if:
+        - condition: template
+          value_template: >
+            {{ (context | from_json).result.blind_enabled }}
+      then:
+        - repeat:
+            for_each: >
+              {{ (context | from_json).result.blind_targets_list }}
+            sequence:
+              - alias: Check if move is needed
+                if:
+                  - condition: template
+                    value_template: >
+                      {{ repeat.item.target_pos != repeat.item.current_pos }}
+                then:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: >
+                        {{ repeat.item.entity_id }}
+                    data:
+                      position: >
+                        {{ repeat.item.target_pos }}
+
+# ---------------------
+# --- Room Control Mode
+# ---------------------
+mode: restart
+max_exceeded: silent
+trace:
+  stored_traces: !input automation_trace_count

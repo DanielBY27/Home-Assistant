@@ -258,6 +258,13 @@ All modified controllers build upon the BASIC controller, then have additional i
     - [Configuration](./examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml)
     - [Trigger Sensor](./examples/sensors/emhass_go-echarger_trigger.yaml)
 
+### Other Blueprints
+
+---
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A//raw.githubusercontent.com/DanielBY27/Home-Assistant/refs/heads/main/blueprints/automation/room_control.yaml)
+
+- **Room Control**: Comprehensive room control automation that manages heating and roller shutters based on presence, window status, and sun position.
+
 
 ### References
 

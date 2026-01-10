@@ -1,0 +1,26 @@
+alias: Parents
+description: ""
+use_blueprint:
+  path: room_control.yaml
+  input:
+    present_entity:
+      - person.daniel
+      - person.tanja
+    window_entity:
+      - binary_sensor.eltern_fenster
+    blind_entity:
+      - cover.eltern_rolladen
+    heating_entity:
+      - climate.eltern_antrieb
+    blind_allow_opening_at_home: false
+    blind_open_earliest: "06:30:00"
+    blind_open_offset_time:
+      hours: 0
+      minutes: 0
+      seconds: 0
+    blind_close_offset_time:
+      hours: 0
+      minutes: 20
+      seconds: 0
+    blind_close_latest: "21:30:00"
+    blind_setup: default

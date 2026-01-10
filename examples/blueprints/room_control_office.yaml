@@ -1,0 +1,27 @@
+alias: Office
+description: ""
+use_blueprint:
+  path: room_control.yaml
+  input:
+    present_entity:
+      - person.daniel
+      - person.lukas
+      - person.simon
+    window_entity:
+      - binary_sensor.fenster
+    blind_entity:
+      - cover.buro_rolladen
+    heating_entity:
+      - climate.buro_antrieb
+    blind_allow_opening_at_home: true
+    blind_open_earliest: "06:33:00"
+    blind_open_offset_time:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    blind_close_offset_time:
+      hours: 0
+      minutes: 23
+      seconds: 0
+    blind_close_latest: "21:33:00"
+    blind_setup: default
