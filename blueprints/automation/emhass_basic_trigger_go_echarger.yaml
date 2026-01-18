@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller for go-echarger (v202512_1)
+  name: EMHASS Deferrable Load Controller for go-echarger (v202601)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -438,7 +438,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202512_1
+  blueprint_version: v202601
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -603,6 +603,13 @@ triggers:
     above: !input wait_value
     for: "00:00:05"
     id: wait_sensor_value_above
+  - trigger: state
+    entity_id:
+      - !input input_trigger
+    from: null
+    to: null
+    for: "00:00:05"
+    id: input_sensor_value_changed
   - trigger: numeric_state
     entity_id:
       - !input input_trigger
@@ -1137,13 +1144,9 @@ actions:
       - condition: template
         value_template: >
           {% set config = context | from_json %}
-          {% set goe_action_needed = (config.goe_current | string) != (config.result.goe | string) %}
           {% if
-            config.result.target_status != 'none' and
-            (
-              (goe_action_needed | default(true) | bool) or
-              (config.result.action_needed | default(true) | bool)
-            )
+            (config.goe_current.charging | string) != (config.result.goe.charging | string) or
+            (config.goe_current.power | int) != (config.result.goe.power | int)
           %}
             {{ true }}
           {% else %}
