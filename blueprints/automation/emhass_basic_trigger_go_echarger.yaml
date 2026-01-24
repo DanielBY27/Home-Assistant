@@ -824,6 +824,37 @@ actions:
           {% endif %}
         {% endif %}
 
+        {# --- Culate goe power --- #}
+        {# --- Got to wait --- #}
+        {% if res.automation_action == 'wait' %}
+          {% set res.log_msg = res.log_msg + ['Goe power switch to status wait'] %}
+          {% set res.goe_charging = "1" %}
+          {% set res.goe_power = 6 %}
+
+        {# --- Got to running (force) --- #}
+        {% elif res.automation_action == 'running' or config.emhass_us == 'running' %}
+          {% set res.log_msg = res.log_msg + ['Goe power switch to status normal running'] %}
+          {% set res.goe_charging = "0" %}
+          {% set goe_power_calc = (([config.trigger_sensor_value, config.goe_minimum_power] | max) / (config.goe_voltage * 3)) | round(0, 'ceil') | int %}
+          {% set res.goe_power = [goe_power_calc, 16] | min %}
+        {% elif (res.automation_action == 'running' or config.emhass_us == 'running') and (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) %}
+          {% set res.log_msg = res.log_msg + ['Goe power switch to status force running'] %}
+          {% set res.goe_charging = "0" %}
+          {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(config.goe_power_number_sensor_default) | int %}
+
+        {# --- Got to done --- #}
+        {% elif res.automation_action == 'done' %}
+          {% set res.log_msg = res.log_msg + ['Goe power switch to status done'] %}
+          {% if config.emhass_us in ['wait', 'running', 'done'] %}
+            {% set res.goe_charging = "1" %}
+            {% set res.goe_power = 6 %}
+          {% endif %}
+
+        {# --- State change are not allowed --- #}
+        {% else %}
+          {% set res.log_msg = res.log_msg + ['Goe power no state found'] %}
+        {% endif %}
+
         {# --- Got to wait --- #}
         {% if res.automation_action == 'wait' %}
           {% set res.log_msg = res.log_msg + ['Go to status wait'] %}
@@ -832,8 +863,6 @@ actions:
           {% set res.notify_enabled = config.notify_wait_message is not none and config.notify_wait_message != '' %}
           {% set res.notify_message = config.notify_wait_message %}
           {% set res.new_ss = config.emhass_ss if config.emhass_ss > 0 else as_timestamp(config.current_time) | int %}
-          {% set res.goe_charging = "1" %}
-          {% set res.goe_power = 6 %}
 
         {# --- Got to running (force) --- #}
         {% elif res.automation_action == 'running' %}
@@ -851,11 +880,9 @@ actions:
             {% set res.notify_enabled = config.notify_running_message is not none and config.notify_running_message != '' %}
             {% set res.notify_message = config.notify_running_message %}
             {% set res.new_ss = config.emhass_ss if config.emhass_ss > 0 else as_timestamp(config.current_time) | int %}
-            {% set res.goe_charging = "0" %}
             {% if (config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-'))) %}
               {% set res.log_msg = res.log_msg + ['Set force running options'] %}
-              {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(config.goe_power_number_sensor_default) | int %}
-              {% set res.new_po = (res.goe_power * (res.goe_voltage * 3)) | default(11000) | int %}
+              {% set res.new_po = (res.goe_power * (config.goe_voltage * 3)) | default(11000) | int %}
               {% set res.new_us = config.status_sensor_value %}
               {% set res.target_status = res.new_us %}
               {% set res.new_si = true %}
@@ -867,8 +894,6 @@ actions:
               {% set res.log_msg = res.log_msg + ['Set running options'] %}
               {% set res.new_us = 'running' %}
               {% set res.target_status = res.new_us %}
-              {% set goe_power_calc = (([config.trigger_sensor_value, config.goe_minimum_power] | max) / (config.goe_voltage * 3)) | round(0, 'ceil') | int %}
-              {% set res.goe_power = [goe_power_calc, 16] | min %}
             {% endif %}
             {% if config.update_sensor_type in ['number', 'input_number'] %}
               {% set res.sensor_value_number = config.wait_sensor_value %}
@@ -886,10 +911,6 @@ actions:
           {% set res.notify_message = config.notify_done_message %}
           {% set res.new_ss = 0 %}
           {% set res.new_ho = 0 %}
-          {% if config.emhass_us in ['wait', 'running', 'done'] %}
-            {% set res.goe_charging = "1" %}
-            {% set res.goe_power = 6 %}
-          {% endif %}
           {% if config.update_sensor_type in ['number', 'input_number'] %}
             {% set res.sensor_value_number = config.stop_sensor_value if config.stop_sensor_overwrite_value == -1 else config.stop_sensor_overwrite_value %}
           {% else %}
@@ -933,7 +954,8 @@ actions:
           'automation': {
             'trigger_id': automation_trigger_id,
             'logger_level': config.automation_logger_level,
-            'is_user_action': is_user_action
+            'is_user_action': is_user_action,
+            'running_sensors_delay': res.new_running_sensors_delay
           },
           'source_json': {
             'po': config.emhass_po,
