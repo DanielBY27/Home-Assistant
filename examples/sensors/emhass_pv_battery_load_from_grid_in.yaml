@@ -12,6 +12,9 @@
       {% elif now_months in [11, 2] %}
         {% set min_soc_pct = 40 %}
         {% set max_soc_pct = 60 %}
+      {% elif now_months in [10, 3] %}
+        {% set min_soc_pct = 35 %}
+        {% set max_soc_pct = 55 %}
       {% else %}
         {% set min_soc_pct = 20 %}
         {% set max_soc_pct = 50 %}
