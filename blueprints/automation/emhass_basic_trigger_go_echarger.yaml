@@ -832,15 +832,15 @@ actions:
           {% set res.goe_power = 6 %}
 
         {# --- Got to running (force) --- #}
+        {% elif (res.automation_action == 'running' or config.emhass_us == 'running') and (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) %}
+          {% set res.log_msg = res.log_msg + ['Goe power switch to status force running'] %}
+          {% set res.goe_charging = "0" %}
+          {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(config.goe_power_number_sensor_default) | int %}
         {% elif res.automation_action == 'running' %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status normal running'] %}
           {% set res.goe_charging = "0" %}
           {% set goe_power_calc = (([config.trigger_sensor_value, config.goe_minimum_power] | max) / (config.goe_voltage * 3)) | round(0, 'ceil') | int %}
           {% set res.goe_power = [goe_power_calc, 16] | min %}
-        {% elif (res.automation_action == 'running' or config.emhass_us == 'running') and (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) %}
-          {% set res.log_msg = res.log_msg + ['Goe power switch to status force running'] %}
-          {% set res.goe_charging = "0" %}
-          {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(config.goe_power_number_sensor_default) | int %}
 
         {# --- Got to done --- #}
         {% elif res.automation_action == 'done' %}
