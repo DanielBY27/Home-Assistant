@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller (v202601)
+  name: EMHASS Deferrable Load Controller (v202603)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -397,7 +397,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202601
+  blueprint_version: v202603
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -441,18 +441,18 @@ variables:
       "automation_logger_level": input_automation_logger_level | default('info') | string | lower,
       "automation_po": input_po | int,
       "automation_ho": input_ho | float(0),
-      "automation_st": input_st | default (0) | int,
-      "automation_et": input_end_timesteps | default(0) | int,
+      "automation_st": input_st | int(0),
+      "automation_et": input_end_timesteps | int(0),
       "automation_se": input_se | default(false) | bool,
       "automation_si": input_si | default(true) | bool,
       "automation_si_work": input_si_work | default(true) | bool,
-      "automation_mp": input_mp | default(1) | int,
-      "automation_pe": input_pe | default(0) | int,
-      "automation_et_force": input_end_timesteps_force_run | default(0) | int,
+      "automation_mp": input_mp | int(0),
+      "automation_pe": input_pe | int(0),
+      "automation_et_force": input_end_timesteps_force_run | int(0),
       "allow_allways_to_done_value": input_allow_allways_to_done | default(false) | bool,
       "trigger_strategy_value": input_trigger_strategy | default("1") | string,
       "trigger_sensor_name": input_trigger_sensor | string,
-      "trigger_sensor_value": states(input_trigger_sensor | string) | default(0) | int,
+      "trigger_sensor_value": states(input_trigger_sensor | string) | int(0),
       "trigger_sensor_attribute_name": (input_trigger_sensor | string).split('.')[-1],
       "update_sensor_name": input_update_sensor | string,
       "update_sensor_type": (input_update_sensor | string).split('.')[0],
@@ -470,39 +470,39 @@ variables:
       "notify_done_message": input_notify_done | default('') | string,
       "wait_sensor_name": input_wait_sensor | string,
       "wait_sensor_value": states(input_wait_sensor | string) | default(0) | float,
-      "wait_sensor_threshold": input_wait_value | default(1) | int,
+      "wait_sensor_threshold": input_wait_value | int(0),
       "skipp_wait_to_force_value": input_skipp_wait_to_force | default(false) | bool,
-      "running_stabilize_sensors_delay": input_running_stabilize_sensors_delay | default(0) | int(0),
+      "running_stabilize_sensors_delay": input_running_stabilize_sensors_delay | int(0),
       "wait_times_hours_value": input_wait_times_hours | default('0') | string,
       "wait_times_minutes_value": input_wait_times_minutes | default('5') | string,
       "stop_sensor_name": input_stop_sensor | string,
       "stop_sensor_value": states(input_stop_sensor | string) | default(0) | float,
-      "stop_sensor_overwrite_value": input_stop_value_overwrite | default(-1) | int,
-      "stop_sensor_threshold": input_stop_value | default(1) | int,
+      "stop_sensor_overwrite_value": input_stop_value_overwrite | int(-1),
+      "stop_sensor_threshold": input_stop_value | int(0),
       "update_sensor_value": states(input_update_sensor | string) | default('off') | string,
-      "emhass_step_value": emhass_step | default(30) | int,
-      "emhass_step_value_hour": (1 / (60 / (emhass_step | default(30) | int))) | default(0.5) | float,
-      "emhass_current_time_delta": (now_dt - timedelta(minutes=(emhass_step | default(30) | int))) | as_datetime | as_local | string,
-      "emhass_po": status_json['po'] | default(1) | int,
-      "emhass_ho": status_json['ho'] | default(0) | float,
-      "emhass_st": status_json['st'] | default(0) | int,
-      "emhass_et": status_json['et'] | default(0) | int,
-      "emhass_se": status_json['se'] | default(false) | bool,
-      "emhass_si": status_json['si'] | default(true) | bool,
-      "emhass_mp": status_json['mp'] | default(1) | int,
-      "emhass_pe": status_json['pe'] | default(0) | int,
+      "emhass_step_value": emhass_step | int(30),
+      "emhass_step_value_hour": (1 / (60 / (emhass_step | int(30)))) | float(0.5),
+      "emhass_current_time_delta": (now_dt - timedelta(minutes=(emhass_step | int(30)))) | as_datetime | as_local | string,
+      "emhass_po": status_json['po'] | int(1),
+      "emhass_ho": status_json['ho'] | float(0),
+      "emhass_st": status_json['st'] | int(0),
+      "emhass_et": status_json['et'] | int(0),
+      "emhass_se": status_json['se'] | bool(false),
+      "emhass_si": status_json['si'] | bool(true),
+      "emhass_mp": status_json['mp'] | int(1),
+      "emhass_pe": status_json['pe'] | int(0),
       "emhass_us": status_json['us'] | default('done') | string,
-      "emhass_ss": status_json['ss'] | default(0) | int
+      "emhass_ss": status_json['ss'] | int(0)
     } %}
     {% set ns = namespace(count=0, count_done=0, count_open=0, power=0, power_done=0, power_done_min=0,
         power_done_max=0, power_open=0, power_open_min=0, power_open_max=0)
     %}
-    {% for item in (state_attr(snapshot_base.trigger_sensor_name, 'deferrables_schedule') | default([])) %}
+    {% for item in (state_attr(snapshot_base.trigger_sensor_name, 'deferrables_schedule') | default([], true)) %}
       {% set p = item[snapshot_base.trigger_sensor_attribute_name] | float(0) %}
       {% set d = item.date | as_datetime %}
       {% set ns.count = ns.count + 1 %}
       {% set ns.power = ns.power + p %}
-      {% if d >= (now_dt - timedelta(minutes=(snapshot_base.emhass_step_value | default(30) | int))) %}
+      {% if d >= (now_dt - timedelta(minutes=(snapshot_base.emhass_step_value | int(30)))) %}
         {% set ns.count_open = ns.count_open + 1 %}
         {% set ns.power_open = ns.power_open + p %}
         {% if p > 0 %}
@@ -773,7 +773,7 @@ actions:
           {% else %}
             {% set res.notify_enabled = config.notify_running_message is not none and config.notify_running_message != '' %}
             {% set res.notify_message = config.notify_running_message %}
-            {% set res.new_ss = config.emhass_ss if config.emhass_ss > 0 else as_timestamp(config.current_time) | int %}
+            {% set res.new_ss = (as_timestamp(config.current_time) | int) if (is_user_action == true or config.emhass_ss == 0) else config.emhass_ss %}
             {% if (config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-'))) %}
               {% set res.log_msg = res.log_msg + ['Set force running options'] %}
               {% set res.new_us = config.status_sensor_value %}
@@ -782,7 +782,7 @@ actions:
               {% set res.new_se = false %}
               {% set res.new_st = 0 %}
               {% set res.new_ho = config.automation_ho + ((config.automation_et_force * config.emhass_step_value) / 60) %}
-              {% set res.new_et = (res.new_ho / config.emhass_step_value_hour) | int %}
+              {% set res.new_et = [ (res.new_ho / config.emhass_step_value_hour) | int, config.automation_et ] | max %}
             {% else %}
               {% set res.log_msg = res.log_msg + ['Set running options'] %}
               {% set res.new_us = 'running' %}
@@ -820,8 +820,8 @@ actions:
         {% endif %}
 
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
-        {# --- A new calculation can only be generated via the status 'done' -> 'wait' --- #}
-        {% set json_override_allowed = (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') or (config.emhass_deferrable_power_open == 0) %}
+        {# --- A new calculation can only be generated via the status 'done' -> 'wait' or by a user action --- #}
+        {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') or (config.emhass_deferrable_power_open == 0) %}
         {% set result_target_json = {
             'po': res.new_po if json_override_allowed else config.emhass_po,
             'ho': res.new_ho if json_override_allowed else config.emhass_ho,
@@ -829,7 +829,7 @@ actions:
             'et': res.new_et if json_override_allowed else config.emhass_et,
             'se': res.new_se if json_override_allowed else config.emhass_se,
             'si': res.new_si if json_override_allowed else config.emhass_si,
-            'mp': res.new_mp if json_override_allowed else config.emhass_mp,
+            'mp': [res.new_mp, (res.new_po if json_override_allowed else config.emhass_po)] | min if json_override_allowed else [config.automation_mp, config.automation_po] | min,
             'pe': res.new_pe if json_override_allowed else config.emhass_pe,
             'us': res.new_us,
             'ss': res.new_ss

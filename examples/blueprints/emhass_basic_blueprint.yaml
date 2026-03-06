@@ -114,3 +114,7 @@ use_blueprint:
     emhass_config_inverter_ac_input_max: 10000
     emhass_config_set_nocharge_from_grid: false
     emhass_config_battery_minimum_state_of_charge: 0.05
+    notify_group_name: parents_mobile_phones
+    enable_optim_failure_notification: true
+    emhass_config_set_nodischarge_to_grid: true
+    emhass_config_compute_curtailment: true
