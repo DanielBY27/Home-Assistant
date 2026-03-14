@@ -1,0 +1,10 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {},
+    "expected": {
+        "variables": {
+            "snapshot": "{\"trigger_sensor_value\": 1000, \"wait_sensor_value\": 0.0, \"automation_logger_level\": \"info\", \"emhass_deferrable_count\": 9, \"emhass_deferrable_power_open\": 6000.0, \"status_sensor_value\": \"wait\", \"emhass_step_value\": 15, \"emhass_step_value_hour\": 0.25}"
+        }
+    }
+}

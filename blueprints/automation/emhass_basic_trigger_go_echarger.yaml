@@ -505,7 +505,7 @@ variables:
       "status_sensor_changed": states[(input_status_sensor | string)].last_changed | as_datetime | as_local | string,
       "status_sensor_changed_by_user": (states.person | selectattr('attributes.user_id', 'eq', states[(input_status_sensor | string)].context.user_id) | list) | length > 0,
       "status_json_sensor_name": input_emhass_sensor | string,
-      "status_json_sensor_value": status_json | string,
+      "status_json_sensor_value": status_json | to_json,
       "status_json_sensor_changed": states[(input_emhass_sensor | string)].last_changed | as_datetime | as_local | string,
       "status_json_sensor_changed_by_user": (states.person | selectattr('attributes.user_id', 'eq', states[(input_emhass_sensor | string)].context.user_id) | list) | length > 0,
       "notify_group_name": input_notify_group | default('') | string,
@@ -523,6 +523,7 @@ variables:
       "stop_sensor_value": states(input_stop_sensor | string) | default(0) | float,
       "stop_sensor_overwrite_value": input_stop_value_overwrite | default(-1) | int,
       "stop_sensor_threshold": input_stop_value | default(1) | int,
+      "update_sensor_value": states(input_update_sensor | string) | default('off') | string,
       "emhass_step_value": emhass_step | default(30) | int,
       "emhass_step_value_hour": (1 / (60 / (emhass_step | default(30) | int))) | default(0.5) | float,
       "emhass_current_time_delta": (now_dt - timedelta(minutes=(emhass_step | default(30) | int))) | as_datetime | as_local | string,
@@ -789,7 +790,6 @@ actions:
             (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
             (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) and
             config.wait_sensor_value > config.wait_sensor_threshold and
-            config.trigger_sensor_value > 0 and
             config.goe_pluged_binary_sensor_value == true
           %}
             {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1120)'] %}
@@ -876,6 +876,9 @@ actions:
               )
           %}
             {% set res.log_msg = res.log_msg + ['The status is already in a running state: ' + config.emhass_us] %}
+            {% set res.new_us = config.emhass_us %}
+            {% set res.target_status = res.new_us %}
+            {% set res.sensor_value_switch = 'on' %}
           {% else %}
             {% set res.notify_enabled = config.notify_running_message is not none and config.notify_running_message != '' %}
             {% set res.notify_message = config.notify_running_message %}
@@ -947,7 +950,10 @@ actions:
         {% if res.new_us == 'none' %}
           {% set res.action_needed = false %}
         {% else %}
-          {% set res.action_needed = config.status_json_sensor_value != (result_target_json | string) %}
+          {% set json_changed = config.status_json_sensor_value != (result_target_json | to_json) %}
+          {% set switch_mismatch = config.update_sensor_name != 'none' and config.update_sensor_type not in ['number', 'input_number'] and config.update_sensor_value != res.sensor_value_switch %}
+          {% set goe_mismatch = (config.goe_allow_charging_select_value != res.goe_charging) or (config.goe_power_number_sensor_value != res.goe_power) %}
+          {% set res.action_needed = json_changed or switch_mismatch or goe_mismatch %}
         {% endif %}
 
         {{ {

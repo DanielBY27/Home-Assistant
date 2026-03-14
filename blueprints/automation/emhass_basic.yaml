@@ -1104,7 +1104,7 @@ variables:
       'emhass_step_value_hour': (1 / steps_per_hour) | float,
       'emhass_steps_per_hour': (60 / step_minutes) | int,
       'emhass_current_time_delta': (now_dt - timedelta(minutes=step_minutes)) | as_datetime | as_local | string,
-      'emhass_current_time_delta_publish': (now_dt - timedelta(minutes=(emhass_publish_minutes_timer_int + 1 | default(6) | int))) | as_datetime | as_local | string,
+      'emhass_current_time_delta_publish': (now_dt - timedelta(minutes=(emhass_publish_minutes_timer_int | int + 1 | default(6) | int))) | as_datetime | as_local | string,
       'emhass_historic_days_to_retrieve': emhass_config_historic_days_to_retrieve | default(9) | int,
       'emhass_num_lags': (1440 / step_minutes) | int,
       'emhass_ml_forecast_json_default': {
@@ -1148,7 +1148,7 @@ variables:
 
       {# --- Change Detection --- #}
       {% if trigger_json_obj is not none %}
-        {% set is_changed_recently = (trigger_json_obj.last_changed > snapshot_base.emhass_current_time_delta_publish | as_datetime) | default(true) | bool %}
+        {% set is_changed_recently = (trigger_json_obj.last_changed | as_datetime > snapshot_base.emhass_current_time_delta_publish | as_datetime) | default(true) | bool %}
       {% else %}
         {% set is_changed_recently = false %}
       {% endif %}

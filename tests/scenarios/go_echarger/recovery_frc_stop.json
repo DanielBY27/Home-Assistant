@@ -1,0 +1,25 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
+    "overrides": {
+        "input_select.goe_emhass_status": "done",
+        "input_text.goe_emhass_json": "{\"po\":11034,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600}",
+        "sensor.p_deferrable1": {"state": "1000", "attributes": {"deferrables_schedule": []}},
+        "select.goe_allow_charging": "0",
+        "number.goe_requested_current": "16",
+        "binary_sensor.goe_car_plugged": "on"
+    },
+    "trigger": {
+        "id": "input_state_changed",
+        "entity_id": "input_select.goe_emhass_status"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "done",
+            "goe": {
+                "charging": "1"
+            }
+        }
+    }
+}

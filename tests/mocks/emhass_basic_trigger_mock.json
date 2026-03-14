@@ -1,0 +1,104 @@
+{
+  "now": "2026-03-14T10:00:00+01:00",
+  "inputs": {
+    "automation_logger_level": "INFO",
+    "automation_trace_count": 10,
+    "emhass_config_optimization_time_step": "15",
+    "allow_allways_to_done": false,
+    "trigger_strategy": "1",
+    "input_trigger": "sensor.p_deferrable0",
+    "update_sensor": "switch.geschirrspuler",
+    "input_status": "input_select.dishwasher_emhass_status",
+    "notify_group": "parents_mobile_phones",
+    "notify_wait": "",
+    "notify_running": "",
+    "notify_done": "Geschirrspüler ist fertig!",
+    "wait_sensor": "sensor.geschirrspuler_leistung",
+    "wait_value": 9,
+    "skipp_wait_to_force": false,
+    "running_stabilize_sensors_delay": 6,
+    "wait_times_hours": "0",
+    "wait_times_minutes": "5",
+    "stop_sensor": "sensor.geschirrspulerstatistik10",
+    "stop_value": 30,
+    "stop_value_overwrite": -1,
+    "input_emhass": "input_text.dishwasher_emhass_json",
+    "nominal_powers": 1000,
+    "start_timesteps": 0,
+    "deferrable_load_as_semi_cont": false,
+    "deferrable_load_single_constant": true,
+    "deferrable_load_single_constant_work": true,
+    "minimum_power_deferrable_load": 200,
+    "deferrable_startup_penalty": 0,
+    "operating_hours": "1.5",
+    "end_timesteps": 12,
+    "end_timesteps_force_run": 0
+  },
+  "states": {
+    "input_select.dishwasher_emhass_status": {
+      "state": "wait",
+      "attributes": {},
+      "last_changed": "2026-03-14T09:30:00+01:00",
+      "context": { "user_id": null }
+    },
+    "input_text.dishwasher_emhass_json": {
+      "state": "{\"po\": 1000, \"ho\": 1.5, \"st\": 0, \"et\": 12, \"se\": false, \"si\": true, \"mp\": 200, \"pe\": 0, \"us\": \"wait\", \"ss\": 1773480600}",
+      "attributes": {},
+      "last_changed": "2026-03-14T09:30:00+01:00",
+      "context": { "user_id": null }
+    },
+    "sensor.p_deferrable0": {
+      "state": "1000",
+      "attributes": {
+        "deferrables_schedule": [
+          { "p_deferrable0": 0, "date": "2026-03-14T09:00:00+01:00" },
+          { "p_deferrable0": 0, "date": "2026-03-14T09:30:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T10:00:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T10:15:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T10:30:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T10:45:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T11:00:00+01:00" },
+          { "p_deferrable0": 1000, "date": "2026-03-14T11:15:00+01:00" },
+          { "p_deferrable0": 0, "date": "2026-03-14T11:30:00+01:00" }
+        ]
+      },
+      "last_changed": "2026-03-14T10:00:00+01:00",
+      "context": { "user_id": null }
+    },
+    "sensor.geschirrspuler_leistung": {
+      "state": "0",
+      "attributes": {},
+      "last_changed": "2026-03-14T09:00:00+01:00",
+      "context": { "user_id": null }
+    },
+    "sensor.geschirrspulerstatistik10": {
+      "state": "10",
+      "attributes": {},
+      "last_changed": "2026-03-14T09:00:00+01:00",
+      "context": { "user_id": null }
+    },
+    "person.daniel": {
+      "state": "home",
+      "attributes": {
+         "user_id": "123456789"
+       },
+      "last_changed": "2026-03-14T08:00:00+01:00",
+      "context": { "user_id": null }
+    }
+  },
+  "persons": [
+    {
+      "entity_id": "person.daniel",
+      "state": "home",
+      "attributes": {
+        "user_id": "123456789"
+      }
+    }
+  ],
+  "trigger": {
+    "id": "input_sensor_value_above",
+    "entity_id": "sensor.p_deferrable0",
+    "from_state": { "state": "0" },
+    "to_state": { "state": "2000" }
+  }
+}

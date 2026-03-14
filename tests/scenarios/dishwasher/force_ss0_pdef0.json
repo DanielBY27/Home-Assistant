@@ -1,0 +1,27 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": "force",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"force\",\"ss\":0}",
+        "sensor.p_deferrable0": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "sensor.geschirrspuler_leistung": "31",
+        "sensor.geschirrspulerstatistik10": "31",
+        "switch.geschirrspuler": "on"
+    },
+    "trigger": {
+        "id": "cron",
+        "platform": "time_pattern"
+    },
+    "expected": {
+        "context": {
+            "action_needed": false,
+            "target_status": "force"
+        }
+    }
+}

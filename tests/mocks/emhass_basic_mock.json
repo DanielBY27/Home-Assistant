@@ -1,0 +1,146 @@
+{
+  "now": "2026-03-14T10:00:00+01:00",
+  "states": {
+    "sensor.scb_solar_power": "4500",
+    "sensor.emhass_config_home_power_no_var_loads": "1200",
+    "sensor.scb_battery_soc": "50",
+    "sun.sun": {
+      "state": "above_horizon",
+      "attributes": {
+        "next_rising": "2026-03-15T06:15:00+01:00",
+        "next_setting": "2026-03-14T18:45:00+01:00"
+      }
+    },
+    "sensor.tibber_rohdaten_cache": {
+      "state": "OK",
+      "attributes": {
+        "price_data": [
+          {"start_time": "2026-03-14T10:00:00+01:00", "price": 0.32},
+          {"start_time": "2026-03-14T11:00:00+01:00", "price": 0.30},
+          {"start_time": "2026-03-14T12:00:00+01:00", "price": 0.28}
+        ]
+      }
+    },
+    "sensor.tibber27a_strompreis": {
+      "state": "0.35",
+      "attributes": {
+        "avg_price": 0.35
+      }
+    },
+    "sensor.solcast_pv_forecast_prognose_heute": {
+        "state": "45.0",
+        "attributes": {
+            "detailedForecast": [
+                {"period_start": "2026-03-14T10:00:00+01:00", "pv_estimate": 1.2},
+                {"period_start": "2026-03-14T10:30:00+01:00", "pv_estimate": 1.5}
+            ]
+        }
+    },
+    "sensor.solcast_pv_forecast_prognose_morgen": {
+        "state": "40.0",
+        "attributes": {
+            "detailedForecast": [
+                {"period_start": "2026-03-15T10:00:00+01:00", "pv_estimate": 1.0}
+            ]
+        }
+    },
+    "input_text.dishwasher_emhass_json": {
+      "state": "{\"us\":\"done\",\"ho\":2.5,\"st\":4,\"et\":45,\"po\":2500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 08:30:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "Dishwasher"
+      }
+    },
+    "input_text.tumble_dryer_emhass_json": {
+      "state": "{\"us\":\"wait\",\"ho\":1.5,\"st\":20,\"et\":48,\"po\":2000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":1,\"last_changed\":\"2026-03-14 09:15:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "Tumble Dryer"
+      }
+    },
+    "input_text.washing_machine_emhass_json": {
+      "state": "{\"us\":\"running\",\"ho\":2.0,\"st\":0,\"et\":96,\"po\":1500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 09:45:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "Washing Machine"
+      }
+    },
+    "input_text.water_bioler_emhass_json": {
+      "state": "{\"us\":\"wait\",\"ho\":3.0,\"st\":10,\"et\":40,\"po\":3000,\"mp\":1000,\"se\":true,\"si\":false,\"pe\":2,\"last_changed\":\"2026-03-14 07:00:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "Water Boiler"
+      }
+    },
+    "input_text.wallbox_emhass_json": {
+      "state": "{\"us\":\"done\",\"ho\":4.0,\"st\":0,\"et\":96,\"po\":11000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 04:00:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "Wallbox"
+      }
+    },
+    "input_text.pv_battery_emhass_json": {
+      "state": "{\"us\":\"wait\",\"ho\":0,\"st\":0,\"et\":96,\"po\":5000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 10:00:00+01:00\"}",
+      "attributes": {
+        "friendly_name": "PV Battery"
+      }
+    },
+    "automation.emhass_basic_controller": {
+      "state": "on",
+      "attributes": {
+          "friendly_name": "EMHASS Basic Controller"
+      },
+      "last_changed": "2026-03-14T09:00:00+01:00"
+    }
+  },
+  "inputs": {
+    "list_emhass_deferrable_loads": [
+      "input_text.dishwasher_emhass_json",
+      "input_text.tumble_dryer_emhass_json",
+      "input_text.washing_machine_emhass_json",
+      "input_text.water_bioler_emhass_json",
+      "input_text.wallbox_emhass_json",
+      "input_text.pv_battery_emhass_json"
+    ],
+    "automation_logger_level": "INFO",
+    "automation_trace_count": 30,
+    "automation_started_manually": "log",
+    "emhass_config_optimization_time_step": "15",
+    "emhass_config_sensor_power_photovoltaics": "sensor.scb_solar_power",
+    "emhass_config_sensor_power_load_no_var_loads": "sensor.emhass_config_home_power_no_var_loads",
+    "emhass_config_load_forecast_method": "mlforecaster",
+    "emhass_config_soc_init": "{{ states('sensor.scb_battery_soc') | float(0) / 100 }}",
+    "emhass_config_soc_final": 0.2,
+    "emhass_config_load_cost_forecast": "[0.3] * 96",
+    "emhass_config_p_pv_forecast": "[0] * 96",
+    "emhass_rest_name": "rest_command.emhass_rest_command",
+    "emhass_protocol": "http",
+    "emhass_host": "localhost",
+    "emhass_port": 5000,
+    "emhass_api_publish": "action/publish-data",
+    "emhass_api_optim": "action/dayahead-optim",
+    "emhass_api_save": "set-config",
+    "emhass_api_ml": "action/forecast-model-fit",
+    "enable_optim_failure_notification": false,
+    "notify_group_name": "",
+    "emhass_config_costfun": "self-consumption",
+    "emhass_config_battery_nominal_energy_capacity": 18000,
+    "emhass_config_battery_charge_efficiency": 0.95,
+    "emhass_config_battery_discharge_efficiency": 0.95,
+    "emhass_config_battery_charge_power_max": 10000,
+    "emhass_config_battery_discharge_power_max": 6000,
+    "emhass_config_battery_maximum_state_of_charge": 0.9,
+    "emhass_config_battery_minimum_state_of_charge": 0.05,
+    "emhass_config_inverter_ac_output_max": 10000,
+    "emhass_config_inverter_ac_input_max": 10000,
+    "emhass_config_maximum_power_from_grid": 15000,
+    "emhass_config_maximum_power_to_grid": 9000,
+    "emhass_config_inverter_is_hybrid": true,
+    "emhass_config_set_use_battery": true,
+    "emhass_config_set_use_pv": true,
+    "emhass_config_method_ts_round": "nearest",
+    "emhass_config_delta_forecast_daily": 1,
+    "emhass_config_historic_days_to_retrieve": 60,
+    "emhass_config_load_negative": false,
+    "emhass_config_set_zero_min": true,
+    "emhass_config_num_threads": 0,
+    "emhass_config_lp_solver_timeout": 45,
+    "emhass_config_weather_forecast_method": "open-meteo",
+    "emhass_config_open_meteo_cache_max_age": 30
+  }
+}

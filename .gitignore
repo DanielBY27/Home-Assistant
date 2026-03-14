@@ -7,11 +7,16 @@
 *.db
 __pycache__/
 *.pyc
+.pytest_cache/
+tests/debug_*.py
+tests/*.txt
+tests/__pycache__/
 
 # IDE/Editor
 .vscode/ # VS Code Workspace-Einstellungen
 .idea/ # JetBrains IDEs
 *~
+.editorconfig.old
 
 # macOS
 .DS_Store

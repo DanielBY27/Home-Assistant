@@ -1,0 +1,34 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
+    "overrides": {
+        "input_select.goe_emhass_status": "done",
+        "input_text.goe_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"done\",\"ss\":0}",
+        "sensor.p_deferrable1": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "select.goe_allow_charging": "1",
+        "number.goe_requested_current": "6",
+        "binary_sensor.goe_car_plugged": "off"
+    },
+    "trigger": {
+        "id": "cron",
+        "platform": "time_pattern"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "done",
+            "target_json": {
+                "us": "done",
+                "ho": 0
+            },
+            "sensor": {
+                "value_switch": "off"
+            }
+        }
+    }
+}
