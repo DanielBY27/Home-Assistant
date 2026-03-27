@@ -1,0 +1,34 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
+    "overrides": {
+        "input_select.wallbox_emhass_status": {
+            "state": "force-16",
+            "last_changed": "2026-03-14T09:00:00+01:00",
+            "context": { "user_id": null }
+        },
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600}",
+        "sensor.p_deferrable4": {
+            "state": "11000",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "sensor.emhass_go_echarger_trigger": "0",
+        "select.goe_297534_frc": "0",
+        "number.goe_297534_amp": "16",
+        "binary_sensor.goe_297534_car_0": "on"
+    },
+    "trigger": {
+        "id": "cron"
+    },
+    "expected": {
+        "context": {
+            "target_status": "force-16",
+            "goe": {
+                "charging": "0",
+                "power": 16
+            }
+        }
+    }
+}

@@ -824,6 +824,12 @@ actions:
           {% endif %}
         {% endif %}
 
+        {# --- Override status in force run for go-eCharger --- #}
+        {% if (config.status_sensor_value).startswith('force') and config.goe_pluged_binary_sensor_value == true %}
+          {% set res.automation_action = 'running' %}
+          {% set res.log_msg = res.log_msg + ['Force mode override active (1301)'] %}
+        {% endif %}
+
         {# --- Culate goe power --- #}
         {# --- Got to wait --- #}
         {% if res.automation_action == 'wait' %}
