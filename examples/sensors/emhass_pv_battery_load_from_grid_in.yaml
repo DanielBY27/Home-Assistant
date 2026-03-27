@@ -15,9 +15,12 @@
       {% elif now_months in [10, 3] %}
         {% set min_soc_pct = 35 %}
         {% set max_soc_pct = 55 %}
+      {% elif now_months in [9, 4] %}
+        {% set min_soc_pct = 30 %}
+        {% set max_soc_pct = 50 %}
       {% else %}
         {% set min_soc_pct = 20 %}
-        {% set max_soc_pct = 50 %}
+        {% set max_soc_pct = 45 %}
       {% endif %}
       {% set consumption_forecast_24h = (state_attr('sensor.p_load_forecast', 'forecasts') | map(attribute='p_load_forecast') | map('float') | sum) * 0.25 %}
       {% set pv_forecast_24h = (state_attr('sensor.p_pv_forecast', 'forecasts') | map(attribute='p_pv_forecast') | map('float') | sum) * 0.25 %}
