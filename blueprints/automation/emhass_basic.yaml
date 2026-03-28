@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Basic Automation Controller (v202603)
+  name: EMHASS Basic Automation Controller (v202604)
   description: |
     This blueprint acts as the central controller for the EMHASS (Energy Management Optimization for Home Assistant) integration.
     It is the **only** automation that should communicate directly with the EMHASS add-on.
@@ -973,7 +973,7 @@ blueprint:
 # --------------------
 
 variables:
-  blueprint_version: v202603
+  blueprint_version: v202604
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count

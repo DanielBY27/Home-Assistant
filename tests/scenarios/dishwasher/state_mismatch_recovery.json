@@ -1,0 +1,24 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": {
+            "state": "force",
+            "context": { "user_id": "user_1" },
+            "last_changed": "2026-03-28T07:54:59+01:00"
+        },
+        "input_text.dishwasher_emhass_json": "{\"po\":1600,\"ho\":2.0,\"st\":0,\"et\":20,\"se\":false,\"si\":true,\"mp\":400,\"pe\":0,\"us\":\"wait\",\"ss\":1774680881}",
+        "sensor.dishwasher_leistung": "0.0",
+        "sensor.p_deferrable0": "0"
+    },
+    "trigger": {
+        "id": "stop_sensor_value_below",
+        "entity_id": "sensor.dishwasher_leistung"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "done"
+        }
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": "done",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"done\",\"ss\":0}",
+        "sensor.geschirrspuler_leistung": "15",
+        "sensor.geschirrspulerstatistik10": "0",
+        "switch.geschirrspuler": "on",
+        "sensor.p_deferrable0": {
+            "state": "unknown"
+        }
+    },
+    "trigger": {
+        "id": "wait_sensor_value_above",
+        "entity_id": "sensor.geschirrspuler_leistung"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "wait",
+            "sensor": {
+                "value_switch": "off"
+            },
+            "target_json": {
+                "us": "wait"
+            }
+        }
+    }
+}

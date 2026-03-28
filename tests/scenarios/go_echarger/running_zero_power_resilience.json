@@ -2,8 +2,8 @@
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
     "overrides": {
-        "input_select.goe_emhass_status": "running",
-        "input_text.goe_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"running\",\"ss\":1773480600}",
+        "input_select.wallbox_emhass_status": "running",
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"running\",\"ss\":1773480600}",
         "sensor.p_deferrable1": {
             "state": "0",
             "attributes": {

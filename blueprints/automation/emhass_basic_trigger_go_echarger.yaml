@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller for go-echarger (v202603)
+  name: EMHASS Deferrable Load Controller for go-echarger (v202604)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -438,7 +438,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202603
+  blueprint_version: v202604
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -667,8 +667,7 @@ conditions:
     value_template: >
       {{
         has_value((snapshot | from_json).status_sensor_name) and
-        has_value((snapshot | from_json).status_json_sensor_name) and
-        has_value((snapshot | from_json).trigger_sensor_name)
+        has_value((snapshot | from_json).status_json_sensor_name)
       }}
 
   - condition: template
@@ -799,6 +798,7 @@ actions:
             config.trigger_strategy_value in ['1', '2', '5', '6'] and
             (
               (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
               config.allow_allways_to_done_value == true
             )
           %}
@@ -809,6 +809,7 @@ actions:
             config.trigger_strategy_value in ['3', '4', '5', '6'] and
             (
               (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
+              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
               config.allow_allways_to_done_value == true
             )
           %}
@@ -851,7 +852,7 @@ actions:
         {# --- Got to done --- #}
         {% elif res.automation_action == 'done' %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status done'] %}
-          {% if config.emhass_us in ['wait', 'running', 'done'] %}
+          {% if config.emhass_us in ['wait', 'running', 'done', 'force'] or (config.emhass_us).startswith('force-') %}
             {% set res.goe_charging = "1" %}
             {% set res.goe_power = 6 %}
           {% endif %}

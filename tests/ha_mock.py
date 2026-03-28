@@ -276,12 +276,6 @@ def load_blueprint_and_render_variables(blueprint_path, mock_data):
     with open(blueprint_path, 'r', encoding='utf-8') as f:
         blueprint_data = yaml.load(f, Loader=SafeLoaderIgnoreUnknown)
 
-    variables_block = blueprint_data.get('variables', {})
-    actions_block = blueprint_data.get('actions', [])
-    for action in actions_block:
-        if isinstance(action, dict) and 'variables' in action:
-            variables_block.update(action['variables'])
-
     # Extract defaults from blueprint inputs (recursively find all inputs)
     def extract_inputs(input_schema):
         inputs = {}
@@ -316,34 +310,52 @@ def load_blueprint_and_render_variables(blueprint_path, mock_data):
         else:
             rendered_inputs[k] = v
 
+    # Separate top-level variables and action variables
+    top_level_vars = blueprint_data.get('variables', {})
+    actions_block = blueprint_data.get('actions', [])
+
+    # 1. Resolve top-level variables
     resolved_vars = {}
     context_vars = {
         "trigger": mock_data.get("trigger", {}),
         "this": {"entity_id": "automation.test_automation"}
     }
     
-    for var_name, var_val in variables_block.items():
-        # print(f"Processing variable: {var_name}") # DEBUG
-        if isinstance(var_val, dict) and "!input" in var_val:
-            input_name = var_val["!input"]
-            resolved_vars[var_name] = rendered_inputs.get(input_name, "")
-        elif isinstance(var_val, str) and ("{{" in var_val or "{%" in var_val):
-            eval_context = {**context_vars, **rendered_inputs, **resolved_vars}
-            try:
-                # print(f"Rendering {var_name}, context keys: {list(eval_context.keys())}") # DEBUG
-                template = env.from_string(var_val)
-                rendered_val = template.render(**eval_context)
-                
-                # If result is a dict or list, serialize it to JSON string to match test expectations
-                # (Home Assistant would do this if the result is intended for a REST command)
-                if isinstance(rendered_val, (dict, list)):
-                    resolved_vars[var_name] = json.dumps(rendered_val)
-                else:
-                    resolved_vars[var_name] = rendered_val
-            except Exception as e:
-                raise Exception(f"Error rendering variable '{var_name}': {e}\nTemplate content:\n{var_val}") from e
+    # helper to render a value
+    def render_val(name, val, current_vars):
+        if isinstance(val, dict) and "!input" in val:
+            input_name = val["!input"]
+            return rendered_inputs.get(input_name, "")
+        elif isinstance(val, str) and ("{{" in val or "{%" in val):
+            eval_context = {**context_vars, **rendered_inputs, **current_vars}
+            template = env.from_string(val)
+            rendered = template.render(**eval_context)
+            if isinstance(rendered, (dict, list)):
+                return json.dumps(rendered)
+            return rendered
         else:
-            resolved_vars[var_name] = var_val
+            return val
+
+    for var_name, var_val in top_level_vars.items():
+        resolved_vars[var_name] = render_val(var_name, var_val, resolved_vars)
+
+    # 2. Evaluate conditions
+    conditions_block = blueprint_data.get('conditions', [])
+    for cond in conditions_block:
+        if isinstance(cond, dict) and cond.get('condition') == 'template':
+            template_str = cond.get('value_template', '')
+            if template_str:
+                eval_context = {**context_vars, **rendered_inputs, **resolved_vars}
+                template = env.from_string(template_str)
+                if not env_wrapper.filter_bool(template.render(**eval_context)):
+                    # If a condition fails, we return the top level variables but mark actions as blocked
+                    return {**resolved_vars, "actions_blocked_by_condition": True, "context": json.dumps({"result": {"action_needed": False}})}
+
+    # 3. Resolve action variables if conditions passed
+    for action in actions_block:
+        if isinstance(action, dict) and 'variables' in action:
+            for var_name, var_val in action['variables'].items():
+                resolved_vars[var_name] = render_val(var_name, var_val, resolved_vars)
 
     return resolved_vars
 
