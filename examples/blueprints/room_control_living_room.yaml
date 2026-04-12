@@ -9,7 +9,7 @@ use_blueprint:
       - person.lukas
       - person.simon
     window_entity:
-      - binary_sensor.wohnzimmer_fenster_hof
+      - binary_sensor.fenster_6
       - binary_sensor.terrassentur_2
     blind_entity:
       - cover.wohnzimmer_rolladen_hof

@@ -7,7 +7,7 @@ use_blueprint:
       - person.daniel
       - person.tanja
     window_entity:
-      - binary_sensor.eltern_fenster
+      - binary_sensor.fenster_5
     blind_entity:
       - cover.eltern_rolladen
     heating_entity:

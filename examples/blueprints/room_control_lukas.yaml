@@ -6,7 +6,7 @@ use_blueprint:
     present_entity:
       - person.lukas
     window_entity:
-      - binary_sensor.lukas_fenster
+      - binary_sensor.fenster_2
     blind_entity:
       - cover.lukas_rolladen
     heating_entity:

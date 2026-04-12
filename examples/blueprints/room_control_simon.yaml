@@ -6,7 +6,7 @@ use_blueprint:
     present_entity:
       - person.simon
     window_entity:
-      - binary_sensor.simon_fenster
+      - binary_sensor.fenster_3
     blind_entity:
       - cover.simon_rolladen
     heating_entity:

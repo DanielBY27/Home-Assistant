@@ -7,7 +7,7 @@ use_blueprint:
       - person.lukas
       - person.simon
     window_entity:
-      - binary_sensor.stefan_fenster
+      - binary_sensor.fenster_4
     blind_entity:
       - cover.stefan_rolladen
     heating_entity:
