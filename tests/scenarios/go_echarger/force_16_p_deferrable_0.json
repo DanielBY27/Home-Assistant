@@ -5,15 +5,23 @@
         "input_select.wallbox_emhass_status": {
             "state": "force-16",
             "last_changed": "2026-03-14T09:00:00+01:00",
-            "context": { "user_id": null }
+            "context": {
+                "user_id": null
+            }
         },
-        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600}",
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600,\"needs_optim\":false}",
         "sensor.p_deferrable4": {
             "state": "0",
             "attributes": {
                 "deferrables_schedule": [
-                    { "p_deferrable4": 0, "date": "2026-03-14T10:00:00+01:00" },
-                    { "p_deferrable4": 0, "date": "2026-03-14T10:15:00+01:00" }
+                    {
+                        "p_deferrable4": 0,
+                        "date": "2026-03-14T10:00:00+01:00"
+                    },
+                    {
+                        "p_deferrable4": 0,
+                        "date": "2026-03-14T10:15:00+01:00"
+                    }
                 ]
             }
         },

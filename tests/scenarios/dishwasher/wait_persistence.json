@@ -1,0 +1,24 @@
+{
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": "wait",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"wait\",\"ss\":1773477000,\"needs_optim\":false}",
+        "sensor.p_deferrable0": {
+            "state": "0",
+            "attributes": {
+                "unit_of_measurement": "W"
+            }
+        }
+    },
+    "now": 1773484200,
+    "expected": {
+        "target_json": {
+            "st": 0,
+            "et": 12,
+            "ho": 1.5,
+            "us": "wait",
+            "needs_optim": true
+        }
+    }
+}

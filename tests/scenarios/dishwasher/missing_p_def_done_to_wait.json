@@ -3,7 +3,7 @@
     "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
     "overrides": {
         "input_select.dishwasher_emhass_status": "done",
-        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"done\",\"ss\":0}",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"done\",\"ss\":0,\"needs_optim\":false}",
         "sensor.geschirrspuler_leistung": "15",
         "sensor.geschirrspulerstatistik10": "0",
         "switch.geschirrspuler": "on",
@@ -23,7 +23,10 @@
                 "value_switch": "off"
             },
             "target_json": {
-                "us": "wait"
+                "us": "wait",
+                "ho": 1.5,
+                "st": 0,
+                "needs_optim": true
             }
         }
     }

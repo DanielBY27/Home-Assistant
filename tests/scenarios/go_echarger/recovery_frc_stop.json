@@ -9,8 +9,13 @@
             },
             "last_changed": "2026-03-14T09:59:55+01:00"
         },
-        "input_text.wallbox_emhass_json": "{\"po\":11034,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600}",
-        "sensor.p_deferrable4": {"state": "0", "attributes": {"deferrables_schedule": []}},
+        "input_text.wallbox_emhass_json": "{\"po\":11034,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":4140,\"pe\":0,\"us\":\"force-16\",\"ss\":1773480600,\"needs_optim\":false}",
+        "sensor.p_deferrable4": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
         "sensor.emhass_go_echarger_trigger": "0",
         "select.goe_allow_charging": "0",
         "number.goe_requested_current": "16",

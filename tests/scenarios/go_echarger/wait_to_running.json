@@ -3,7 +3,7 @@
     "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
     "overrides": {
         "input_select.wallbox_emhass_status": "wait",
-        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"wait\",\"ss\":1773480600}",
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"wait\",\"ss\":1773480600,\"needs_optim\":false}",
         "sensor.p_deferrable4": {
             "state": "4140",
             "attributes": {
@@ -28,7 +28,8 @@
                 "power": 6
             },
             "target_json": {
-                "us": "running"
+                "us": "running",
+                "needs_optim": false
             }
         }
     }

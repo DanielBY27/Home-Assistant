@@ -14,7 +14,7 @@
                 "user_id": "user_1"
             }
         },
-        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"done\",\"ss\":0}",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"done\",\"ss\":0,\"needs_optim\":false}",
         "sensor.geschirrspuler_leistung": "4",
         "sensor.geschirrspulerstatistik10": "0",
         "switch.geschirrspuler": "off",
@@ -35,7 +35,8 @@
                 "value_switch": "on"
             },
             "target_json": {
-                "us": "force"
+                "us": "force",
+                "needs_optim": true
             }
         }
     }

@@ -1350,24 +1350,11 @@ actions:
         {% endif %}
 
         {# --- Action optim enabled --- #}
-        {% for i in range(config.trigger_json | length) %}
+        {% set trigger_objs = config.trigger_json | map('from_json') | list %}
+        {% for i in range(trigger_objs | length) %}
           {% if
+              trigger_objs[i].needs_optim | default(false) == true or
               (
-                config.emhass_trigger_changed[i] and
-                automation_trigger_id == 'publish' and
-                (
-                  (
-                    config.emhass_trigger_us[i] == 'wait' and
-                    config.emhass_deferrable_power_open[i] == 0
-                  ) or (
-                    (config.emhass_trigger_us[i] in ['running', 'force'] or (config.emhass_trigger_us[i]).startswith('force-')) and
-                    config.emhass_deferrable_power_current[i] == 0
-                  ) or (
-                    config.emhass_trigger_us[i] == 'done' and
-                    config.emhass_deferrable_power_open[i] > 0
-                  )
-                )
-              ) or (
                 automation_trigger_id == 'none' and
                 config.automation_started_manually in ['all', 'optim']
               ) or (
@@ -1375,7 +1362,7 @@ actions:
                 (current_time).minute == 0
               )
           %}
-            {% set res.log_msg = res.log_msg + ['Action optim enabled by sensor.p_deferrable' ~ i] %}
+            {% set res.log_msg = res.log_msg + ['Action optim enabled by trigger ' ~ i] %}
             {% set res.optim_enabled = true %}
             {% break %}
           {% endif %}
@@ -1394,57 +1381,7 @@ actions:
           {% set res.publish_enabled = true %}
         {% endif %}
 
-        {# --- Action recalculate running triggers for new optim --- #}
-        {% for i in range(config.trigger_json | length) %}
-          {% set calc_trigger = namespace(
-            ho = config.emhass_trigger_ho[i], st = config.emhass_trigger_st[i], et = config.emhass_trigger_et[i],
-            po = config.emhass_trigger_po[i], mp = config.emhass_trigger_mp[i], pe = config.emhass_trigger_pe[i],
-            sensor_ho = 0, elapsed_steps = 0)
-          %}
-
-          {% if config.emhass_trigger_ss[i] > 0 %}
-            {% set elapsed_seconds = as_timestamp(now()) - config.emhass_trigger_ss[i] %}
-            {% set calc_trigger.elapsed_steps = (elapsed_seconds / (config.emhass_optimization_time_step * 60)) | int %}
-            {% set calc_trigger.st = ([config.emhass_trigger_st[i] - calc_trigger.elapsed_steps, 0] | max) | int %}
-            {% set calc_trigger.et = ([config.emhass_trigger_et[i] - calc_trigger.elapsed_steps, 0] | max) | int %}
-          {% endif %}
-
-          {% if config.emhass_trigger_si[i] == true %}
-            {% set calc_trigger.sensor_ho = config.emhass_deferrable_count_open_work[i] * config.emhass_step_value_hour %}
-          {% else %}
-            {% set calc_trigger.sensor_ho = (config.emhass_deferrable_power_open[i] * config.emhass_step_value_hour) / config.emhass_trigger_po[i] %}
-          {% endif %}
-
-          {% if config.emhass_trigger_us[i] == 'done' %}
-            {% set res.log_msg = res.log_msg + ['Reset done trigger ' ~ i ~ ' (parameters to 0)'] %}
-            {% set calc_trigger.ho = 0 %}
-            {% set calc_trigger.st = 0 %}
-          {% elif config.emhass_trigger_ss[i] > 0 and (config.emhass_trigger_us[i] in ['running', 'force'] or (config.emhass_trigger_us[i]).startswith('force-')) %}
-            {% set res.log_msg = res.log_msg + ['Recalculate running trigger ' ~ i ~ ' (ho/st/et)'] %}
-            {% if calc_trigger.sensor_ho > 0.01 %}
-              {% set max_allowed_ho = ([calc_trigger.et - calc_trigger.st, 0] | max) * config.emhass_step_value_hour %}
-              {% set target_ho = ((calc_trigger.sensor_ho * config.emhass_steps_per_hour) | round(0)) / config.emhass_steps_per_hour %}
-              {# Use nested lists to ensure we are always filtering lists, not scalars #}
-              {% set calc_trigger.ho = [target_ho, ([max_allowed_ho - 0.0001, 0] | max)] | min %}
-            {% endif %}
-            {% set calc_trigger.st = 0 %}
-            {% if config.emhass_trigger_si[i] == true and config.emhass_deferrable_power_current[i] > 0 %}
-              {% set calc_trigger.et = config.emhass_deferrable_count_open_work[i] %}
-            {% endif %}
-          {% elif config.emhass_trigger_ss[i] > 0 %}
-            {% set res.log_msg = res.log_msg + ['Shifted wait/done trigger ' ~ i ~ ' (st/et)'] %}
-          {% else %}
-            {% set res.log_msg = res.log_msg + ['Input (Fallback/Start) for sensor.p_deferrable' ~ i] %}
-          {% endif %}
-
-          {% set res.new_ho = res.new_ho + [calc_trigger.ho] %}
-          {% set res.new_st = res.new_st + [calc_trigger.st] %}
-          {% set res.new_et = res.new_et + [calc_trigger.et] %}
-          {% set res.new_po = res.new_po + [calc_trigger.po] %}
-          {% set res.new_mp = res.new_mp + [calc_trigger.mp] %}
-          {% set res.new_pe = res.new_pe + [calc_trigger.pe] %}
-        {% endfor %}
-        {% set res.log_msg = res.log_msg + ['New ho / st / et / po / mp / pe: ' ~ (res.new_ho | join('; ')) ~ ' / ' ~ (res.new_st | join('; ')) ~ ' / ' ~ (res.new_et | join('; ')) ~ ' / ' ~ (res.new_po | join('; ')) ~ ' / ' ~ (res.new_mp | join('; ')) ~ ' / ' ~ (res.new_pe | join('; '))] %}
+        {# --- Action build result data from triggers --- #}
         {% set result_data = {
           'optim': {
             'soc_init': emhass_config_soc_init_calc,
@@ -1452,15 +1389,15 @@ actions:
             'load_cost_forecast': emhass_config_load_cost_forecast_calc,
             'p_pv_forecast': emhass_config_p_pv_forecast_calc,
             'pv_power_forecast': emhass_config_p_pv_forecast_calc,
-            'end_timesteps_of_each_deferrable_load': res.new_et,
-            'minimum_power_of_deferrable_loads': res.new_mp,
-            'nominal_power_of_deferrable_loads': res.new_po,
-            'operating_hours_of_each_deferrable_load': res.new_ho,
-            'set_deferrable_load_single_constant': config.emhass_trigger_si,
-            'set_deferrable_startup_penalty': res.new_pe,
-            'start_timesteps_of_each_deferrable_load': res.new_st,
-            'treat_deferrable_load_as_semi_cont': config.emhass_trigger_se,
-            'number_of_deferrable_loads': config.trigger_json | length,
+            'end_timesteps_of_each_deferrable_load': trigger_objs | map(attribute='et') | list,
+            'minimum_power_of_deferrable_loads': trigger_objs | map(attribute='mp') | list,
+            'nominal_power_of_deferrable_loads': trigger_objs | map(attribute='po') | list,
+            'operating_hours_of_each_deferrable_load': trigger_objs | map(attribute='ho') | list,
+            'set_deferrable_load_single_constant': trigger_objs | map(attribute='si') | list,
+            'set_deferrable_startup_penalty': trigger_objs | map(attribute='pe') | list,
+            'start_timesteps_of_each_deferrable_load': trigger_objs | map(attribute='st') | list,
+            'treat_deferrable_load_as_semi_cont': trigger_objs | map(attribute='se') | list,
+            'number_of_deferrable_loads': trigger_objs | length,
             'force_update_data': emhass_config_force_update_data,
             'get_data_from_home_assistant': emhass_config_get_data_from_home_assistant,
             'set_deferrable_max_startups': [0,0,0,0,0,0]
@@ -1541,18 +1478,19 @@ actions:
               emhass_config_sensor_power_photovoltaics | string,
               emhass_config_sensor_power_load_no_var_loads | string
             ],
-            'end_timesteps_of_each_deferrable_load': res.new_et,
-            'minimum_power_of_deferrable_loads': config.emhass_trigger_mp,
-            'nominal_power_of_deferrable_loads': config.emhass_trigger_po,
-            'number_of_deferrable_loads': config.trigger_json | length,
-            'operating_hours_of_each_deferrable_load': ([0] * (config.trigger_json | length)),
-            'set_deferrable_load_single_constant': config.emhass_trigger_si,
-            'set_deferrable_startup_penalty': config.emhass_trigger_pe,
-            'start_timesteps_of_each_deferrable_load': res.new_st,
-            'treat_deferrable_load_as_semi_cont': config.emhass_trigger_se,
+            'end_timesteps_of_each_deferrable_load': trigger_objs | map(attribute='et') | list,
+            'minimum_power_of_deferrable_loads': trigger_objs | map(attribute='mp') | list,
+            'nominal_power_of_deferrable_loads': trigger_objs | map(attribute='po') | list,
+            'number_of_deferrable_loads': trigger_objs | length,
+            'operating_hours_of_each_deferrable_load': ([0] * (trigger_objs | length)),
+            'set_deferrable_load_single_constant': trigger_objs | map(attribute='si') | list,
+            'set_deferrable_startup_penalty': trigger_objs | map(attribute='pe') | list,
+            'start_timesteps_of_each_deferrable_load': trigger_objs | map(attribute='st') | list,
+            'treat_deferrable_load_as_semi_cont': trigger_objs | map(attribute='se') | list,
             'set_deferrable_max_startups': [0,0,0,0,0,0]
           },
-          'forecast': config.emhass_ml_forecast_json_default | combine(config.emhass_ml_forecast_json_overwrite)
+          'forecast': config.emhass_ml_forecast_json_default | combine(config.emhass_ml_forecast_json_overwrite),
+          'action_needed': (res.optim_enabled or res.publish_enabled or res.save_enabled or res.forecast_enabled)
         } %}
 
         {% set actions_to_run = [] %}

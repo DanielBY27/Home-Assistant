@@ -330,8 +330,19 @@ def load_blueprint_and_render_variables(blueprint_path, mock_data):
             eval_context = {**context_vars, **rendered_inputs, **current_vars}
             template = env.from_string(val)
             rendered = template.render(**eval_context)
+            
+            # Auto-parse JSON if it looks like a dict/list
+            if isinstance(rendered, str) and rendered.strip().startswith(("{", "[")):
+                try:
+                    # Replace single quotes with double quotes for JSON parsing if needed, 
+                    # though Jinja's to_json usually produces valid JSON.
+                    parsed = json.loads(rendered.replace("'", '"')) if "'" in rendered and '"' not in rendered else json.loads(rendered)
+                    return parsed
+                except (ValueError, TypeError):
+                    pass
+            
             if isinstance(rendered, (dict, list)):
-                return json.dumps(rendered)
+                return rendered
             return rendered
         else:
             return val
@@ -410,51 +421,54 @@ def load_scenario(scenario_path):
     if "trigger" in scenario:
         mock_data["trigger"] = scenario["trigger"]
 
+    # 5. Apply time override
+    if "now" in scenario:
+        if isinstance(scenario["now"], int):
+            mock_data["now"] = datetime.datetime.fromtimestamp(scenario["now"], tz=datetime.timezone.utc).isoformat()
+        else:
+            mock_data["now"] = scenario["now"]
+
     return mock_data, scenario.get("expected", {})
 
 def assert_scenario_result(variables, expected):
     """Standardized assertion for scenario results."""
+    def to_dict(val):
+        if isinstance(val, dict): return val
+        if isinstance(val, str):
+            try: return json.loads(val.replace("'", '"')) if "'" in val and '"' not in val else json.loads(val)
+            except: pass
+        return val
+
     # Check variables directly
     for key, expected_val in expected.get("variables", {}).items():
         actual_val = variables.get(key)
         
-        # Fuzzy comparison for JSON strings (subset match)
-        if isinstance(expected_val, str) and isinstance(actual_val, str):
-            try:
-                expected_json = json.loads(expected_val)
-                actual_json = json.loads(actual_val)
-                if isinstance(expected_json, dict) and isinstance(actual_json, dict):
-                    for k, v in expected_json.items():
-                        assert actual_json.get(k) == v, f"Variable '{key}'['{k}'] (JSON) mismatch. Expected {v}, got {actual_json.get(k)}"
-                    continue
-                else:
-                    assert expected_json == actual_json, f"Variable '{key}' (JSON) mismatch. Expected {expected_json}, got {actual_json}"
-                    continue
-            except (json.JSONDecodeError, ValueError):
-                pass
-                
-        assert actual_val == expected_val, f"Variable '{key}' mismatch. Expected {expected_val}, got {actual_val}"
-    
-    # Check context results
+        expected_json = to_dict(expected_val)
+        actual_json = to_dict(actual_val)
+
+        if isinstance(expected_json, dict) and isinstance(actual_json, dict):
+            for k, v in expected_json.items():
+                assert actual_json.get(k) == v, f"Variable '{key}'['{k}'] (JSON) mismatch. Expected {v}, got {actual_json.get(k)}"
+        else:
+            assert actual_val == expected_val, f"Variable '{key}' mismatch. Expected {expected_val}, got {actual_val}"
+
+    # Check result context if present
     if "context" in expected:
-        context_json = json.loads(variables.get("context", "{}"))
-        result = context_json.get("result", {})
+        # Resolve 'context' from variables (it might be a JSON string or a dict)
+        actual_context_raw = variables.get("context", "{}")
+        actual_context = to_dict(actual_context_raw)
         
-        for key, expected_val in expected["context"].items():
-            if key == "target_json":
-                # Special handling for nested target_json
-                actual_target = result.get("target_json", {})
-                for k, v in expected_val.items():
-                    assert actual_target.get(k) == v, f"target_json['{k}'] mismatch. Expected {v}, got {actual_target.get(k)}"
-            elif key == "sensor":
-                # Special handling for nested sensor
-                actual_sensor = result.get("sensor", {})
-                for k, v in expected_val.items():
-                    assert actual_sensor.get(k) == v, f"sensor['{k}'] mismatch. Expected {v}, got {actual_sensor.get(k)}"
-            elif key == "goe":
-                # Special handling for nested goe result
-                actual_goe = result.get("goe", {})
-                for k, v in expected_val.items():
-                    assert actual_goe.get(k) == v, f"goe['{k}'] mismatch. Expected {v}, got {actual_goe.get(k)}"
-            else:
-                assert result.get(key) == expected_val, f"Context result '{key}' mismatch. Expected {expected_val}, got {result.get(key)}"
+        # In our blueprints, the actual result is usually under a 'result' key in the context JSON
+        actual_result = actual_context.get("result", actual_context) if isinstance(actual_context, dict) else {}
+        expected_context = expected["context"]
+        
+        # Helper for recursive dict comparison
+        def assert_dict_match(actual, expected, path=""):
+            for k, v in expected.items():
+                curr_path = f"{path}.{k}" if path else k
+                if isinstance(v, dict):
+                    assert_dict_match(actual.get(k, {}), v, curr_path)
+                else:
+                    assert actual.get(k) == v, f"Result match failed at {curr_path}. Expected {v}, got {actual.get(k)}"
+        
+        assert_dict_match(actual_result, expected_context)

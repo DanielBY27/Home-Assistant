@@ -3,8 +3,13 @@
     "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
     "overrides": {
         "input_select.dishwasher_emhass_status": "wait",
-        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"wait\",\"ss\":1773480600}",
-        "sensor.p_deferrable0": {"state": "0", "attributes": {"deferrables_schedule": []}},
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"wait\",\"ss\":1773480600,\"needs_optim\":false}",
+        "sensor.p_deferrable0": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
         "sensor.geschirrspuler_leistung": "0",
         "sensor.geschirrspulerstatistik10": "0",
         "switch.geschirrspuler": "off"
@@ -15,10 +20,14 @@
     },
     "expected": {
         "context": {
-            "action_needed": false,
-            "target_status": "none",
+            "action_needed": true,
+            "target_status": "wait",
             "sensor": {
                 "value_switch": "off"
+            },
+            "target_json": {
+                "us": "wait",
+                "needs_optim": true
             }
         }
     }

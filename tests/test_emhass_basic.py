@@ -46,7 +46,8 @@ def test_emhass_basic_scenarios(scenario, overrides, trigger, check_type):
     variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic.yaml', mock_data)
     
     assert "context" in variables, f"Context missing in rendered variables for scenario: {scenario}"
-    context_json = json.loads(variables["context"])
+    context_raw = variables["context"]
+    context_json = json.loads(context_raw) if isinstance(context_raw, str) else context_raw
     
     if check_type == "publish":
         # Validates that the publish payload is correctly constructed

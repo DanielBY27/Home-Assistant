@@ -476,6 +476,7 @@ variables:
   input_goe_allow_charging_select: !input goe_allow_charging_select
   input_goe_pluged_binary_sensor: !input goe_pluged_binary_sensor
 
+
   # Read in all currently available values and save it read-only in this variable
   snapshot: >
     {% set status_json = states(input_emhass_sensor | string) | from_json(default={}) %}
@@ -548,7 +549,7 @@ variables:
       "goe_minimum_power": 4140,
       "goe_force_enabled": (states(input_status_sensor | string) | default('done') | string).startswith('force')
     } %}
-    {% set ns = namespace(count=0, count_done=0, count_open=0, power=0, power_done=0, power_done_min=0,
+    {% set ns = namespace(count=0, count_done=0, count_open=0, count_open_work=0, power=0, power_done=0, power_done_min=0,
         power_done_max=0, power_open=0, power_open_min=0, power_open_max=0)
     %}
     {% for item in (state_attr(snapshot_base.trigger_sensor_name, 'deferrables_schedule') | default([], true)) %}
@@ -560,6 +561,7 @@ variables:
         {% set ns.count_open = ns.count_open + 1 %}
         {% set ns.power_open = ns.power_open + p %}
         {% if p > 0 %}
+          {% set ns.count_open_work = ns.count_open_work + 1 %}
           {% if ns.power_open_min <= 0 %}
             {% set ns.power_open_min = p %}
           {% else %}
@@ -582,6 +584,7 @@ variables:
       "emhass_deferrable_count": ns.count,
       "emhass_deferrable_count_done": ns.count_done,
       "emhass_deferrable_count_open": ns.count_open,
+      "emhass_deferrable_count_open_work": ns.count_open_work,
       "emhass_deferrable_power": ns.power,
       "emhass_deferrable_power_done": ns.power_done,
       "emhass_deferrable_power_done_min": ns.power_done_min,
@@ -590,7 +593,8 @@ variables:
       "emhass_deferrable_power_open_min": ns.power_open_min,
       "emhass_deferrable_power_open_max": ns.power_open_max
     } %}
-    {{ (snapshot_base | combine(def)) | to_json }}
+    {{- (snapshot_base | combine(def)) | to_json -}}
+
 
 # ---------------------------
 # --- EMHASS Trigger Triggers
@@ -607,8 +611,6 @@ triggers:
   - trigger: state
     entity_id:
       - !input input_trigger
-    from: null
-    to: null
     for: "00:00:05"
     id: input_sensor_value_changed
   - trigger: numeric_state
@@ -694,25 +696,87 @@ actions:
   - variables:
       context: >
         {% set config = snapshot | from_json %}
+        {% set step_min = (config.emhass_step_value | int(30)) %}
+        {% set step_hour = config.emhass_step_value_hour | float(0.5) %}
+        
+        {# --- 1. Combined Initialization --- #}
+        {# Intermediate Calculated Fields (formerly calc_params) #}
+        {# Final Target Fields #}
+        {% set res = namespace(
+            ho = config.automation_ho, st = config.automation_st, et = config.automation_et,
+            po = config.automation_po, mp = config.automation_mp, pe = config.automation_pe,
+            sensor_ho = 0, elapsed_steps = 0,
+            action_needed = false, sensor_value_number = 0,
+            sensor_value_switch = 'off', target_status = 'none',
+            new_po = 0, new_ho = 0, new_st = 0, new_et = 0,
+            new_se = config.automation_se, new_si = config.automation_si,
+            new_mp = 0, new_pe = 0,
+            new_us = 'none', new_ss = config.emhass_ss, new_running_sensors_delay = 0,
+            notify_enabled = false, notify_message = '',
+            goe_power = config.goe_power_number_sensor_value,
+            goe_charging = config.goe_allow_charging_select_value,
+            automation_action = 'none', log_msg = []
+        ) %}
+
+        {# --- 2. Time-Based Recalculation (formerly calc_params) --- #}
+        {# 2.1 Time Tracking (Only degrade st/et if NOT in wait state) #}
+        {% if config.emhass_ss > 0 and config.emhass_us != 'wait' %}
+          {% set elapsed_seconds = as_timestamp(now()) - config.emhass_ss %}
+          {% set res.elapsed_steps = ([elapsed_seconds / (step_min * 60), 0] | max) | int %}
+          {% set res.st = ([config.automation_st - res.elapsed_steps, 0] | max) | int %}
+          {% set res.et = ([config.automation_et - res.elapsed_steps, 0] | max) | int %}
+        {% endif %}
+
+        {# 2.2 Work Progress (ho) #}
+        {% if config.emhass_deferrable_count > 0 %}
+          {% if config.automation_si == true %}
+            {% set res.sensor_ho = config.emhass_deferrable_count_open_work * step_hour %}
+          {% else %}
+            {% set res.sensor_ho = (config.emhass_deferrable_power_open * step_hour) / config.automation_po %}
+          {% endif %}
+        {% else %}
+          {% set res.sensor_ho = config.automation_ho %}
+        {% endif %}
+
+        {# 2.3 State-Based Recalculation #}
+        {% if config.emhass_ss > 0 and (config.emhass_us in ['running', 'force'] or (config.emhass_us).startswith('force-')) %}
+          {% if res.sensor_ho > 0.01 %}
+            {% set max_allowed_ho = ([res.et - res.st, 0] | max) * step_hour %}
+            {% set target_ho = ((res.sensor_ho * (60/step_min)) | round(0)) / (60/step_min) %}
+            {% set res.ho = [target_ho, ([max_allowed_ho - 0.0001, 0] | max)] | min %}
+          {% endif %}
+          {% set res.st = 0 %}
+          {% if config.automation_si == true and config.trigger_sensor_value > 0 and config.emhass_deferrable_count > 0 %}
+            {% set res.et = config.emhass_deferrable_count_open_work %}
+          {% endif %}
+        {% endif %}
+
+        {# 2.4 Final Feasibility Check (ho must never be smaller than et-st window) #}
+        {# In 'wait' state we prioritize keeping the full ho runtime #}
+        {% set window_ho = ([res.et - res.st, 0] | max) * step_hour %}
+        {% if config.emhass_us == 'wait' %}
+          {% set res.ho = config.automation_ho %}
+          {% if res.et < (res.st + (res.ho / step_hour)) %}
+            {% set res.et = (res.st + (res.ho / step_hour)) | int %}
+          {% endif %}
+        {% else %}
+          {% set res.ho = [res.ho, window_ho] | min %}
+        {% endif %}
+
+        {# 2.5 Copy Calculated Values to New Results (Defaults) #}
+        {% set res.new_po = res.po %}
+        {% set res.new_ho = res.ho %}
+        {% set res.new_st = res.st %}
+        {% set res.new_et = res.et %}
+        {% set res.new_mp = res.mp %}
+        {% set res.new_pe = res.pe %}
+
+        {# --- 3. State Machine Logic --- #}
         {% set automation_trigger_id = trigger.id | default('none') | string | lower %}
 
         {# --- User Action Detection --- #}
         {% set is_user_action = config.status_sensor_changed_by_user == true and
           as_timestamp(config.current_time) - as_timestamp(config.status_sensor_changed) < 10 %}
-
-        {# --- Initialize Result Namespace --- #}
-        {% set res = namespace(action_needed = false, sensor_value_number = 0,
-          sensor_value_switch = 'off', target_status = 'none',
-          new_po = config.automation_po, new_ho = config.automation_ho,
-          new_st = config.automation_st, new_et = config.automation_et,
-          new_se = config.automation_se, new_si = config.automation_si,
-          new_mp = config.automation_mp, new_pe = config.automation_pe,
-          new_us = 'none', new_ss = config.emhass_ss, new_running_sensors_delay = 0,
-          notify_enabled = false, notify_message = '',
-          goe_power = config.goe_power_number_sensor_value,
-          goe_charging = config.goe_allow_charging_select_value,
-          automation_action = 'none', log_msg = [])
-        %}
 
         {# --- New State Maschine --- #}
         {% if is_user_action == true %}
@@ -793,6 +857,13 @@ actions:
           %}
             {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1120)'] %}
             {% set res.automation_action = 'running' %}
+          {% elif
+            config.emhass_us == 'wait' and
+            config.status_sensor_value == 'wait' and
+            config.goe_pluged_binary_sensor_value == true
+          %}
+            {% set res.log_msg = res.log_msg + ['Automation stays in state wait (1030)'] %}
+            {% set res.automation_action = 'wait' %}
           {% elif
             config.stop_sensor_value < config.stop_sensor_threshold and
             config.trigger_strategy_value in ['1', '2', '5', '6'] and
@@ -921,6 +992,9 @@ actions:
           {% set res.notify_message = config.notify_done_message %}
           {% set res.new_ss = 0 %}
           {% set res.new_ho = 0 %}
+          {% set res.new_st = 0 %}
+          {% set res.new_po = 0 %}
+          {% set res.new_pe = 0 %}
           {% if config.update_sensor_type in ['number', 'input_number'] %}
             {% set res.sensor_value_number = config.stop_sensor_value if config.stop_sensor_overwrite_value == -1 else config.stop_sensor_overwrite_value %}
           {% else %}
@@ -938,7 +1012,7 @@ actions:
 
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
         {# --- A new calculation can only be generated via the status 'done' -> 'wait' or by a user action --- #}
-        {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us == 'done') or (config.emhass_deferrable_power_open == 0) %}
+        {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us in ['done', 'wait', 'running', 'force']) or (res.new_us).startswith('force-') or (config.emhass_deferrable_power_open == 0) %}
         {% set result_target_json = {
             'po': res.new_po if json_override_allowed else config.emhass_po,
             'ho': res.new_ho if json_override_allowed else config.emhass_ho,
@@ -949,7 +1023,8 @@ actions:
             'mp': [res.new_mp, (res.new_po if json_override_allowed else config.emhass_po)] | min if json_override_allowed else [config.automation_mp, config.automation_po] | min,
             'pe': res.new_pe if json_override_allowed else config.emhass_pe,
             'us': res.new_us,
-            'ss': res.new_ss
+            'ss': res.new_ss,
+            'needs_optim': (res.new_us == 'wait' and (config.emhass_deferrable_power_open == 0 or config.emhass_us == 'done')) or (is_user_action == true)
           }
         %}
 
@@ -1211,10 +1286,6 @@ actions:
         {{ config.automation.running_sensors_delay | default(0) | int(0) }}
       seconds: 0
       milliseconds: 1
-
-# -------------------
-# --- Automation Mode
-# -------------------
 
 mode: single
 max_exceeded: silent

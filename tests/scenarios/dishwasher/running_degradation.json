@@ -2,10 +2,10 @@
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
     "overrides": {
-        "input_select.dishwasher_emhass_status": "force",
-        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"force\",\"ss\":0,\"needs_optim\":false}",
+        "input_select.dishwasher_emhass_status": "running",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"running\",\"ss\":1773480600,\"needs_optim\":false}",
         "sensor.p_deferrable0": {
-            "state": "0",
+            "state": "1000",
             "attributes": {
                 "deferrables_schedule": []
             }
@@ -18,10 +18,18 @@
         "id": "cron",
         "platform": "time_pattern"
     },
+    "now": 1773484200,
     "expected": {
         "context": {
-            "action_needed": false,
-            "target_status": "force"
+            "action_needed": true,
+            "target_status": "running"
+        },
+        "target_json": {
+            "us": "running",
+            "st": 0,
+            "et": 10,
+            "ho": 0.5,
+            "needs_optim": false
         }
     }
 }

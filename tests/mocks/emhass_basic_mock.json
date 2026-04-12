@@ -45,37 +45,37 @@
         }
     },
     "input_text.dishwasher_emhass_json": {
-      "state": "{\"us\":\"done\",\"ho\":2.5,\"st\":4,\"et\":45,\"po\":2500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 08:30:00+01:00\"}",
+      "state": "{\"us\":\"done\",\"ho\":0,\"st\":0,\"et\":45,\"po\":2500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "Dishwasher"
       }
     },
     "input_text.tumble_dryer_emhass_json": {
-      "state": "{\"us\":\"wait\",\"ho\":1.5,\"st\":20,\"et\":48,\"po\":2000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":1,\"last_changed\":\"2026-03-14 09:15:00+01:00\"}",
+      "state": "{\"us\":\"wait\",\"ho\":1.5,\"st\":20,\"et\":48,\"po\":2000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":1,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "Tumble Dryer"
       }
     },
     "input_text.washing_machine_emhass_json": {
-      "state": "{\"us\":\"running\",\"ho\":2.0,\"st\":0,\"et\":96,\"po\":1500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 09:45:00+01:00\"}",
+      "state": "{\"us\":\"running\",\"ho\":2.0,\"st\":0,\"et\":96,\"po\":1500,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "Washing Machine"
       }
     },
     "input_text.water_bioler_emhass_json": {
-      "state": "{\"us\":\"wait\",\"ho\":3.0,\"st\":10,\"et\":40,\"po\":3000,\"mp\":1000,\"se\":true,\"si\":false,\"pe\":2,\"last_changed\":\"2026-03-14 07:00:00+01:00\"}",
+      "state": "{\"us\":\"wait\",\"ho\":3.0,\"st\":10,\"et\":40,\"po\":3000,\"mp\":1000,\"se\":true,\"si\":false,\"pe\":2,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "Water Boiler"
       }
     },
     "input_text.wallbox_emhass_json": {
-      "state": "{\"us\":\"done\",\"ho\":4.0,\"st\":0,\"et\":96,\"po\":11000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 04:00:00+01:00\"}",
+      "state": "{\"us\":\"done\",\"ho\":0,\"st\":0,\"et\":96,\"po\":11000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "Wallbox"
       }
     },
     "input_text.pv_battery_emhass_json": {
-      "state": "{\"us\":\"wait\",\"ho\":0,\"st\":0,\"et\":96,\"po\":5000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"last_changed\":\"2026-03-14 10:00:00+01:00\"}",
+      "state": "{\"us\":\"wait\",\"ho\":0.01,\"st\":0,\"et\":96,\"po\":5000,\"mp\":0,\"se\":false,\"si\":true,\"pe\":0,\"needs_optim\":false}",
       "attributes": {
         "friendly_name": "PV Battery"
       }
