@@ -12,4 +12,4 @@ def test_goe_scenarios(scenario_file):
     mock_data, expected = load_scenario(scenario_file)
     variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic_trigger_go_echarger.yaml', mock_data)
     
-    assert_scenario_result(variables, expected)
+    assert_scenario_result(variables, expected, scenario_file)

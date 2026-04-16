@@ -1,4 +1,5 @@
 {
+    "_comment": "This is the basic test for the done to wait state.",
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
     "overrides": {

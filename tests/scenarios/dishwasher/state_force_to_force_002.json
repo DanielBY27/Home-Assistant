@@ -1,0 +1,40 @@
+{
+    "_comment": "Diffs from the base test state_force_to_force_001 are p_deferrable0 = 1000",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": "force",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"force\",\"ss\":1774680000,\"needs_optim\":false}",
+        "sensor.geschirrspuler_leistung": "300",
+        "sensor.geschirrspulerstatistik10": "300",
+        "switch.geschirrspuler": "on",
+        "sensor.p_deferrable0": {
+            "state": "1000",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        }
+    },
+    "trigger": {
+        "id": "input_sensor_value_changed",
+        "entity_id": "sensor.p_deferrable0"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "force",
+            "sensor": {
+                "value_switch": "on"
+            },
+            "target_json": {
+                "us": "force",
+                "ho": 1.5,
+                "st": 0,
+                "et": 6,
+                "se": false,
+                "si": true,
+                "needs_optim": false
+            }
+        }
+    }
+}

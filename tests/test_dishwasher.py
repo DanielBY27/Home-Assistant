@@ -12,7 +12,7 @@ def test_dishwasher_scenarios(scenario_file):
     mock_data, expected = load_scenario(scenario_file)
     variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic_trigger.yaml', mock_data)
     
-    assert_scenario_result(variables, expected)
+    assert_scenario_result(variables, expected, scenario_file)
 
 # Keeping specific tests for complex checks if needed, but they should also use load_scenario
 def test_dishwasher_initial_snapshot():
@@ -20,4 +20,4 @@ def test_dishwasher_initial_snapshot():
     mock_data, expected = load_scenario('tests/scenarios/dishwasher/wait_snapshot.json')
     variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic_trigger.yaml', mock_data)
     
-    assert_scenario_result(variables, expected)
+    assert_scenario_result(variables, expected, 'wait_snapshot.json')

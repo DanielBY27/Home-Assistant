@@ -1,0 +1,74 @@
+{
+    "_comment": "Diffs from the base test state_wait_to_wait_001 are p_deferrable0 and expected/overrides needs_optim",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": "wait",
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"wait\",\"ss\":1774680000,\"needs_optim\":false}",
+        "sensor.geschirrspuler_leistung": "0",
+        "sensor.geschirrspulerstatistik10": "0",
+        "switch.geschirrspuler": "off",
+        "sensor.p_deferrable0": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": [
+                    {
+                        "p_deferrable0": 0,
+                        "date": "2026-03-14T09:00:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 0,
+                        "date": "2026-03-14T09:15:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T09:30:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T09:45:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T10:00:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T10:15:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T10:30:00+01:00"
+                    },
+                    {
+                        "p_deferrable0": 1000,
+                        "date": "2026-03-14T10:45:00+01:00"
+                    }
+                ]
+            }
+        }
+    },
+    "trigger": {
+        "id": "input_sensor_value_changed",
+        "entity_id": "sensor.geschirrspuler_leistung"
+    },
+    "now": "2026-03-14T09:00:00+01:00",
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "wait",
+            "sensor": {
+                "value_switch": "off"
+            },
+            "target_json": {
+                "us": "wait",
+                "ho": 1.5,
+                "st": 0,
+                "et": 8,
+                "se": false,
+                "si": true,
+                "needs_optim": false
+            }
+        }
+    }
+}

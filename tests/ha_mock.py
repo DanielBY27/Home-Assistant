@@ -430,7 +430,7 @@ def load_scenario(scenario_path):
 
     return mock_data, scenario.get("expected", {})
 
-def assert_scenario_result(variables, expected):
+def assert_scenario_result(variables, expected, scenario_name=""):
     """Standardized assertion for scenario results."""
     def to_dict(val):
         if isinstance(val, dict): return val
@@ -448,9 +448,9 @@ def assert_scenario_result(variables, expected):
 
         if isinstance(expected_json, dict) and isinstance(actual_json, dict):
             for k, v in expected_json.items():
-                assert actual_json.get(k) == v, f"Variable '{key}'['{k}'] (JSON) mismatch. Expected {v}, got {actual_json.get(k)}"
+                assert actual_json.get(k) == v, f"Variable '{key}'['{k}'] (JSON) mismatch. Expected {v}, got {actual_json.get(k)}\n\nFull Expected Variable:\n{json.dumps(expected_json, indent=2)}\n\nFull Actual Variable:\n{json.dumps(actual_json, indent=2)}"
         else:
-            assert actual_val == expected_val, f"Variable '{key}' mismatch. Expected {expected_val}, got {actual_val}"
+            assert actual_val == expected_val, f"Variable '{key}' mismatch.\nExpected: {expected_val}\nActual: {actual_val}"
 
     # Check result context if present
     if "context" in expected:
@@ -463,12 +463,24 @@ def assert_scenario_result(variables, expected):
         expected_context = expected["context"]
         
         # Helper for recursive dict comparison
-        def assert_dict_match(actual, expected, path=""):
-            for k, v in expected.items():
+        def assert_dict_match(actual, expected_sub, path=""):
+            for k, v in expected_sub.items():
                 curr_path = f"{path}.{k}" if path else k
                 if isinstance(v, dict):
                     assert_dict_match(actual.get(k, {}), v, curr_path)
                 else:
-                    assert actual.get(k) == v, f"Result match failed at {curr_path}. Expected {v}, got {actual.get(k)}"
+                    if actual.get(k) != v:
+                        error_msg = f"Result match failed at {curr_path}. Expected {v}, got {actual.get(k)}\n\nFull Expected Context:\n{json.dumps(expected_context, indent=2)}\n\nFull Actual Context:\n{json.dumps(actual_result, indent=2)}"
+                        # Build debug output with all rendered variables
+                        debug_sections = [f"--- TEST FAILURE [{scenario_name}] ---\n{error_msg}"]
+                        debug_sections.append(f"\nFull Context (all keys):\n{json.dumps(actual_context, indent=2)}")
+                        # Include all rendered blueprint variables (snapshot, etc.)
+                        vars_dump = {}
+                        for var_key, var_val in variables.items():
+                            vars_dump[var_key] = to_dict(var_val) if isinstance(var_val, str) else var_val
+                        debug_sections.append(f"\nAll Blueprint Variables:\n{json.dumps(vars_dump, indent=2, default=str)}")
+                        with open("debug.log", "a") as f:
+                            f.write("\n".join(debug_sections) + "\n\n")
+                        assert False, f"[{scenario_name}] {curr_path}: expected {v}, got {actual.get(k)} — see debug.log for details"
         
         assert_dict_match(actual_result, expected_context)

@@ -6,9 +6,13 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+if (Test-Path "debug.log") {
+    Remove-Item "debug.log" -WarningAction SilentlyContinue | Out-Null
+}
+
 Write-Host "Running tests..."
 # Run the docker container, mapping our current project directory to /app inside the container
-docker run --rm -v "${PWD}:/app" -w /app home-assistant-tests pytest -sv $args
+docker run --rm -v "${PWD}:/app" -w /app home-assistant-tests pytest -sv --tb=line $args
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Tests failed!"

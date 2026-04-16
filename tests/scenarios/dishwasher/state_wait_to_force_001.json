@@ -1,0 +1,52 @@
+{
+    "_comment": "This is the basic test for the wait to force state.",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
+    "overrides": {
+        "input_select.dishwasher_emhass_status": {
+            "state": "force",
+            "context": {
+                "user_id": "user_1"
+            },
+            "last_changed": "2026-03-28T11:10:28+01:00"
+        },
+        "person.user_1": {
+            "attributes": {
+                "user_id": "user_1"
+            }
+        },
+        "input_text.dishwasher_emhass_json": "{\"po\":1000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":false,\"si\":true,\"mp\":200,\"pe\":0,\"us\":\"wait\",\"ss\":1774680000,\"needs_optim\":false}",
+        "sensor.geschirrspuler_leistung": "4",
+        "sensor.geschirrspulerstatistik10": "0",
+        "switch.geschirrspuler": "off",
+        "sensor.p_deferrable0": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        }
+    },
+    "trigger": {
+        "id": "input_state_changed",
+        "entity_id": "input_select.dishwasher_emhass_status"
+    },
+    "now": "2026-03-28T08:00:00+01:00",
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "force",
+            "sensor": {
+                "value_switch": "on"
+            },
+            "target_json": {
+                "us": "force",
+                "ho": 1.5,
+                "st": 0,
+                "et": 6,
+                "se": false,
+                "si": true,
+                "needs_optim": true
+            }
+        }
+    }
+}

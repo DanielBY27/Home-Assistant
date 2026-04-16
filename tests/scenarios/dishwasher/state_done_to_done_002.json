@@ -1,4 +1,5 @@
 {
+    "_comment": "Diffs from the base test state_done_to_done_001, a simple default cron test with many changes",
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_dishwasher.yaml",
     "overrides": {
