@@ -731,6 +731,7 @@ actions:
         {% if config.emhass_deferrable_count > 0 %}
           {% if config.automation_si == true %}
             {% set res.sensor_ho = config.emhass_deferrable_count_open_work * step_hour %}
+            {% set res.et = config.emhass_deferrable_count_open %}
           {% else %}
             {% set res.sensor_ho = (config.emhass_deferrable_power_open * step_hour) / config.automation_po %}
           {% endif %}
@@ -748,6 +749,9 @@ actions:
           {% set res.st = 0 %}
           {% if config.automation_si == true and config.trigger_sensor_value > 0 and config.emhass_deferrable_count > 0 %}
             {% set res.et = config.emhass_deferrable_count_open_work %}
+          {% endif %}
+          {% if (config.emhass_us == 'force' or (config.emhass_us).startswith('force-')) and config.emhass_deferrable_count_open_work == 0 %}
+            {% set res.et = (res.ho / step_hour) | int %}
           {% endif %}
         {% endif %}
 
@@ -970,11 +974,15 @@ actions:
               {% set res.new_se = false %}
               {% set res.new_st = 0 %}
               {% set res.new_ho = config.automation_ho + ((config.automation_et_force * config.emhass_step_value) / 60) %}
-              {% set res.new_et = [ (res.new_ho / config.emhass_step_value_hour) | int, config.automation_et ] | max %}
+              {% set res.new_et = (res.new_ho / config.emhass_step_value_hour) | round(0, 'ceil') | int %}
             {% else %}
               {% set res.log_msg = res.log_msg + ['Set running options'] %}
               {% set res.new_us = 'running' %}
               {% set res.target_status = res.new_us %}
+              {% if config.emhass_si == true %}
+                {% set res.new_st = 0 %}
+                {% set res.new_et = (res.new_ho / config.emhass_step_value_hour) | round(0, 'ceil') | int %}
+              {% endif %}
             {% endif %}
             {% if config.update_sensor_type in ['number', 'input_number'] %}
               {% set res.sensor_value_number = config.wait_sensor_value %}
@@ -988,13 +996,14 @@ actions:
           {% set res.log_msg = res.log_msg + ['Go to status done'] %}
           {% set res.new_us = 'done' %}
           {% set res.target_status = res.new_us %}
-          {% set res.notify_enabled = config.notify_done_message is not none and config.notify_done_message != '' %}
-          {% set res.notify_message = config.notify_done_message %}
           {% set res.new_ss = 0 %}
           {% set res.new_ho = 0 %}
           {% set res.new_st = 0 %}
           {% set res.new_po = 0 %}
           {% set res.new_pe = 0 %}
+          {% set res.new_et = 0 %}
+          {% set res.notify_enabled = config.notify_done_message is not none and config.notify_done_message != '' and config.emhass_us != 'done' %}
+          {% set res.notify_message = config.notify_done_message %}
           {% if config.update_sensor_type in ['number', 'input_number'] %}
             {% set res.sensor_value_number = config.stop_sensor_value if config.stop_sensor_overwrite_value == -1 else config.stop_sensor_overwrite_value %}
           {% else %}
@@ -1286,6 +1295,10 @@ actions:
         {{ config.automation.running_sensors_delay | default(0) | int(0) }}
       seconds: 0
       milliseconds: 1
+
+# -------------------
+# --- Automation Mode
+# -------------------
 
 mode: single
 max_exceeded: silent
