@@ -60,6 +60,7 @@ class HomeAssistantMockEnv:
 
         # has_value global
         self.env.globals['has_value'] = self.mock_has_value
+        self.env.globals['expand'] = self.mock_expand
 
     def mock_now(self):
         return datetime.datetime.fromisoformat(self.mock_data["now"])
@@ -110,6 +111,22 @@ class HomeAssistantMockEnv:
     def mock_has_value(self, entity_id):
         val = self.mock_states_func()(entity_id)
         return val not in ("unknown", "unavailable", None, "")
+
+    def mock_expand(self, *entities):
+        expanded = []
+        states_dict = self.mock_states_func()
+        for entity in entities:
+            if isinstance(entity, str):
+                expanded.append(states_dict[entity])
+            elif isinstance(entity, (list, set, tuple)):
+                for e in entity:
+                    if isinstance(e, str):
+                        expanded.append(states_dict[e])
+                    else:
+                        expanded.append(e)
+            else:
+                expanded.append(entity)
+        return expanded
 
     def mock_timestamp_now(self):
         return self.mock_now().timestamp()
@@ -399,7 +416,9 @@ def load_scenario(scenario_path):
     if "overrides" in scenario:
         overrides = scenario["overrides"]
         for entity_id, state_val in overrides.items():
-            if entity_id in mock_data.get("inputs", {}):
+            # If the key is already in inputs OR it doesn't look like an entity ID (no dot),
+            # treat it as a Blueprint input override.
+            if entity_id in mock_data.get("inputs", {}) or "." not in entity_id:
                 mock_data["inputs"][entity_id] = state_val
             else:
                 if entity_id not in mock_data["states"]:

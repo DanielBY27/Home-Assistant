@@ -50,7 +50,8 @@ blueprint:
             entity:
               multiple: false
               filter:
-                - domain: number
+                - integration: goecharger_api2
+                  domain: number
                   device_class: current
         goe_allow_charging_select:
           name: go-eCharger Allow Charging (Select)
@@ -61,7 +62,8 @@ blueprint:
             entity:
               multiple: false
               filter:
-                - domain: select
+                - integration: goecharger_api2
+                  domain: select
         goe_pluged_binary_sensor:
           name: go-eCharger Car Plugged-in Sensor
           description: >
@@ -71,8 +73,95 @@ blueprint:
             entity:
               multiple: false
               filter:
-                - domain: binary_sensor
+                - integration: goecharger_api2
+                  domain: binary_sensor
                   device_class: plug
+        goe_pv_surplus_enabled:
+          name: PV Surplus Enabled
+          description: >
+            A YAML formula to activate PV surplus. In the simplest case, you can use `true` or `false` (default),
+            or a formula like this one to activate it only during daylight saving time and during the day:
+            `{{ now().dst() is not none and now().dst().seconds > 0 and is_state('sun.sun', 'above_horizon') }}`
+          default: "false"
+          selector:
+            text:
+              multiline: true
+        goe_surplus_sensor:
+          name: go-eCharger PV Surplus Sensor
+          description: >
+            The sensor that indicates the PV surplus (e.g., switch.goe_123456_fup).
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - integration: goecharger_api2
+                  domain: switch
+        goe_load_phase_sensor:
+          name: go-eCharger Load Phase Sensor
+          description: >
+            The sensor that indicates the load phase (e.g., select.goe_123456_psm). Option '0' = auto (default), Option '1' = 1 phase, Option '2' = 3 phases
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - integration: goecharger_api2
+                  domain: select
+        goe_logic_mode:
+          name: Logic Mode (Select)
+          description: >
+            The 'select' entity that controls the charging mode (e.g., select.goe_123456_lmo). Option '3' = default, Option '4' = ECO and 5 = Next trip
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - integration: goecharger_api2
+                  domain: select
+        goe_grid_single_entity:
+          name: Grid Power Entity
+          description: Entity with +/- values (positive = import, negative = export)
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - domain: sensor
+                  device_class: power
+        goe_grid_consumption_entity:
+          name: Grid Consumption Entity
+          description: >
+            Grid consumption (always positive)
+          default:
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - domain: sensor
+                  device_class: power
+        goe_pv_entities:
+          name: PV Power Entities
+          description: >
+            One or more PV entities (required)
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: sensor
+                  device_class: power
+        goe_battery_entity:
+          name: Battery Power Entity
+          description: >
+            One battery entity (optional)
+          default: 
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - domain: sensor
+                  device_class: power
 
     # --- EMHASS Trigger
     grid_basic_trigger_config:
@@ -172,7 +261,7 @@ blueprint:
               max: 1000
               step: 1
               mode: box
-        skipp_wait_to_force:
+        skip_wait_to_force:
           name: Skip 'Wait' and Force 'Running'
           description: >
             When enabled, the automation skips the 'wait' status and goes directly to 'force' ('running') as soon as the 'Wait Sensor' threshold is reached. This starts the load immediately and bypasses EMHASS optimization.
@@ -454,7 +543,7 @@ variables:
   input_notify_done: !input notify_done
   input_wait_sensor: !input wait_sensor
   input_wait_value: !input wait_value
-  input_skipp_wait_to_force: !input skipp_wait_to_force
+  input_skip_wait_to_force: !input skip_wait_to_force
   input_running_stabilize_sensors_delay: !input running_stabilize_sensors_delay
   input_wait_times_hours: !input wait_times_hours
   input_wait_times_minutes: !input wait_times_minutes
@@ -475,7 +564,14 @@ variables:
   input_goe_power_number_sensor: !input goe_power_number_sensor
   input_goe_allow_charging_select: !input goe_allow_charging_select
   input_goe_pluged_binary_sensor: !input goe_pluged_binary_sensor
-
+  input_goe_pv_surplus_enabled: !input goe_pv_surplus_enabled
+  input_goe_surplus_sensor: !input goe_surplus_sensor
+  input_goe_load_phase_sensor: !input goe_load_phase_sensor
+  input_goe_logic_mode: !input goe_logic_mode
+  input_goe_grid_single_entity: !input goe_grid_single_entity
+  input_goe_grid_consumption_entity: !input goe_grid_consumption_entity
+  input_goe_pv_entities: !input goe_pv_entities
+  input_goe_battery_entity: !input goe_battery_entity
 
   # Read in all currently available values and save it read-only in this variable
   snapshot: >
@@ -516,7 +612,7 @@ variables:
       "wait_sensor_name": input_wait_sensor | string,
       "wait_sensor_value": states(input_wait_sensor | string) | default(0) | float,
       "wait_sensor_threshold": input_wait_value | int(0),
-      "skipp_wait_to_force_value": input_skipp_wait_to_force | default(false) | bool,
+      "skip_wait_to_force_value": input_skip_wait_to_force | default(false) | bool,
       "running_stabilize_sensors_delay": input_running_stabilize_sensors_delay | int(0),
       "wait_times_hours_value": input_wait_times_hours | default('0') | string,
       "wait_times_minutes_value": input_wait_times_minutes | default('5') | string,
@@ -545,6 +641,21 @@ variables:
       "goe_allow_charging_select_value": states(input_goe_allow_charging_select | string) | default('1') | string,
       "goe_pluged_binary_sensor_name": input_goe_pluged_binary_sensor | string,
       "goe_pluged_binary_sensor_value": states(input_goe_pluged_binary_sensor | string) | bool(false),
+      "goe_pv_surplus_enabled": input_goe_pv_surplus_enabled | default(false) | bool,
+      "goe_surplus_sensor_name": input_goe_surplus_sensor | string,
+      "goe_surplus_sensor_value": states(input_goe_surplus_sensor | string) | bool(true),
+      "goe_load_phase_sensor_name": input_goe_load_phase_sensor | string,
+      "goe_load_phase_sensor_value": states(input_goe_load_phase_sensor | string) | default('0') | string,
+      "goe_logic_mode_select_name": input_goe_logic_mode | string,
+      "goe_logic_mode_select_value": states(input_goe_logic_mode | string) | default('3') | string,
+      "goe_grid_single_entity_name": input_goe_grid_single_entity | string,
+      "goe_grid_single_entity": states(input_goe_grid_single_entity | string) | float(0),
+      "goe_grid_consumption_entity_name": input_goe_grid_consumption_entity | string,
+      "goe_grid_consumption_entity": states(input_goe_grid_consumption_entity | string) | float(0),
+      "goe_pv_entities_name": input_goe_pv_entities,
+      "goe_pv_entities": expand(input_goe_pv_entities) | map(attribute='state') | map('float', 0) | sum,
+      "goe_battery_entity_name": input_goe_battery_entity | string,
+      "goe_battery_entity": states(input_goe_battery_entity | string) | float(0),
       "goe_voltage": 230,
       "goe_minimum_power": 4140,
       "goe_force_enabled": (states(input_status_sensor | string) | default('done') | string).startswith('force')
@@ -715,6 +826,9 @@ actions:
             notify_enabled = false, notify_message = '',
             goe_power = config.goe_power_number_sensor_value,
             goe_charging = config.goe_allow_charging_select_value,
+            goe_surplus = false,
+            goe_load_phase = "0",
+            goe_logic_mode = "3",
             automation_action = 'none', log_msg = []
         ) %}
 
@@ -901,11 +1015,14 @@ actions:
         {% endif %}
 
         {# --- Override status in force run for go-eCharger --- #}
-        {% if (config.status_sensor_value).startswith('force') and config.goe_pluged_binary_sensor_value == true %}
+        {% if
+          (config.goe_pluged_binary_sensor_value == true) and
+          (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-'))
+        %}
           {% set res.automation_action = 'running' %}
           {% set res.log_msg = res.log_msg + ['Force mode override active (1301)'] %}
         {% endif %}
-
+       
         {# --- Culate goe power --- #}
         {# --- Got to wait --- #}
         {% if res.automation_action == 'wait' %}
@@ -940,7 +1057,7 @@ actions:
         {# --- Got to wait --- #}
         {% if res.automation_action == 'wait' %}
           {% set res.log_msg = res.log_msg + ['Go to status wait'] %}
-          {% set res.new_us = 'wait' if config.skipp_wait_to_force_value == false else 'force' %}
+          {% set res.new_us = 'wait' if config.skip_wait_to_force_value == false else 'force' %}
           {% set res.target_status = res.new_us %}
           {% set res.notify_enabled = config.notify_wait_message is not none and config.notify_wait_message != '' %}
           {% set res.notify_message = config.notify_wait_message %}
@@ -1019,6 +1136,20 @@ actions:
           {% set res.log_msg = res.log_msg + ['No state found. (1310)'] %}
         {% endif %}
 
+        {# --- Override status in surplus run for go-eCharger --- #}
+        {% if
+          (config.goe_pv_surplus_enabled == true) and
+          (config.goe_pluged_binary_sensor_value == true) and
+          (res.new_us in ['wait', 'running'])
+        %}
+          {% set res.log_msg = res.log_msg + ['Overwrite settings for status running in surplus mode ' + res.automation_action + ' - ' + res.new_us] %}
+          {% set res.goe_power = 16 %}
+          {% set res.goe_charging = "0" %}
+          {% set res.goe_logic_mode = "4"  %}
+          {% set res.goe_load_phase = "0" %}
+          {% set res.goe_surplus = true %}
+        {% endif %}
+
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
         {# --- A new calculation can only be generated via the status 'done' -> 'wait' or by a user action --- #}
         {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us in ['done', 'wait', 'running', 'force']) or (res.new_us).startswith('force-') or (config.emhass_deferrable_power_open == 0) %}
@@ -1069,7 +1200,11 @@ actions:
           'goe_current': {
             'charging': config.goe_allow_charging_select_value,
             'power': config.goe_power_number_sensor_value,
-            'pluged': config.goe_pluged_binary_sensor_value
+            'pluged': config.goe_pluged_binary_sensor_value,
+            'surplus_enabled_config': config.goe_pv_surplus_enabled,
+            'surplus_enabled' : config.goe_surplus_sensor_value,
+            'load_phase' : config.goe_load_phase_sensor_value,
+            'logic_mode' : config.goe_logic_mode_select_value
           },
           'result': {
             'action_needed': res.action_needed,
@@ -1089,7 +1224,11 @@ actions:
             'goe': {
               'charging': res.goe_charging,
               'power': res.goe_power,
-              'pluged': config.goe_pluged_binary_sensor_value
+              'pluged': config.goe_pluged_binary_sensor_value,
+              'surplus_enabled_config': config.goe_pv_surplus_enabled,
+              'surplus_enabled' : res.goe_surplus,
+              'load_phase' : res.goe_load_phase,
+              'logic_mode' : res.goe_logic_mode
             }
           },
           'logs': res.log_msg
@@ -1258,20 +1397,37 @@ actions:
                 {{ config.result.notify.message }}
 
   # --- go-echarging settings
-  - alias: Check for go-echarger updates
+  - alias: Check for go-echarger updates for charging, phase and mode
     if:
       - condition: template
         value_template: >
           {% set config = context | from_json %}
           {% if
             (config.goe_current.charging | string) != (config.result.goe.charging | string) or
-            (config.goe_current.power | int) != (config.result.goe.power | int)
+            (config.goe_current.load_phase | string) != (config.result.goe.load_phase | string) or
+            (config.goe_current.logic_mode | string) != (config.result.goe.logic_mode | string) or
+            (config.goe_current.power | int) != (config.result.goe.power | int) or
+            (config.goe_current.surplus_enabled | bool) != (config.result.goe.surplus_enabled | bool)
           %}
             {{ true }}
           {% else %}
             {{ false }}
           {% endif %}
     then:
+      - action: select.select_option
+        data:
+          option: >
+            {% set config = context | from_json %}
+            {{ config.result.goe.load_phase | string }}
+        target:
+          entity_id: !input goe_load_phase_sensor
+      - action: select.select_option
+        data:
+          option: >
+            {% set config = context | from_json %}
+            {{ config.result.goe.logic_mode | string }}
+        target:
+          entity_id: !input goe_logic_mode
       - action: select.select_option
         data:
           option: >
@@ -1286,7 +1442,71 @@ actions:
             {{ config.result.goe.power | int }}
         target:
           entity_id: !input goe_power_number_sensor
-
+      - alias: Set surplus sensor to on/off
+        if:
+          - condition: template
+            value_template: >
+              {% set config = context | from_json %}
+              {{ config.result.goe.surplus_enabled | bool }}
+        then:
+          - action: switch.turn_on
+            target:
+              entity_id: !input goe_surplus_sensor
+        else: 
+          - action: switch.turn_off
+            target:
+              entity_id: !input goe_surplus_sensor
+  - alias: check go surplus is enabled and the car is connected
+    if:
+      - condition: template
+        value_template: >
+          {% set config = context | from_json %}
+          {% if
+            (config.result.goe.surplus_enabled_config | default(false) | bool) and
+            (config.result.goe.pluged | default(false) | bool) and
+            (config.result.goe.logic_mode == "4")
+          %}
+            {{ true }}
+          {% else %}
+            {{ false }}
+          {% endif %}
+    then:
+      - repeat:
+          while:
+            - condition: state
+              entity_id: !input goe_pluged_binary_sensor
+              state:
+                - "on"
+            - condition: not
+              conditions:
+                - condition: state
+                  entity_id: !input input_status
+                  state:
+                    - done
+                    - force
+                    - force-6
+                    - force-10
+                    - force-12
+                    - force-14
+                    - force-16
+          sequence:
+            - variables:
+                pgrid_value_sensor: !input goe_grid_single_entity
+                ppv_value_sensor: !input goe_pv_entities
+                pakku_value_sensor: !input goe_battery_entity
+                pgrid_value: "{{ states(pgrid_value_sensor) | float(0) }}"
+                ppv_value: "{{ expand(ppv_value_sensor) | map(attribute='state') | map('float', 0) | sum }}"
+                pakku_value: "{{ states(pakku_value_sensor) | float(0) }}"
+            - action: goecharger_api2.set_pv_data
+              data:
+                pgrid: '{{ pgrid_value | round(0) | int }}'
+                ppv: '{{ ppv_value | round(0) | int }}'
+                pakku: '{{ pakku_value | round(0) | int }}'
+            - delay:
+                hours: 0
+                minutes: 0
+                seconds: 5
+                milliseconds: 0
   - alias: Wait for running sensor delay
     delay:
       hours: 0

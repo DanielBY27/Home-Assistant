@@ -1,8 +1,10 @@
 {
+    "_comment": "This is the basic test for the done to wait (eco) state.",
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
     "overrides": {
         "input_select.wallbox_emhass_status": "done",
+        "goe_pv_surplus_enabled": "true",
         "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"done\",\"ss\":0,\"needs_optim\":false}",
         "sensor.p_deferrable1": {
             "state": "0",
@@ -10,9 +12,12 @@
                 "deferrables_schedule": []
             }
         },
-        "select.goe_allow_charging": "1",
-        "number.goe_requested_current": "6",
-        "binary_sensor.goe_car_plugged": "off"
+        "sensor.emhass_go_echarger_trigger": "600",
+        "binary_sensor.goe_297534_car_0": "on",
+        "select.goe_297534_frc": "1",
+        "number.goe_297534_amp": "6",
+        "select.goe_297534_lmo": "3",
+        "select.goe_297534_psm": "0"
     },
     "trigger": {
         "id": "cron",
@@ -21,14 +26,25 @@
     "expected": {
         "context": {
             "action_needed": true,
-            "target_status": "done",
+            "target_status": "wait",
             "target_json": {
-                "us": "done",
-                "ho": 0,
-                "needs_optim": false
+                "us": "wait",
+                "ho": 0.25,
+                "st": 0,
+                "ss": 1773478800,
+                "needs_optim": true
             },
             "sensor": {
                 "value_switch": "off"
+            },
+            "goe": {
+                "charging": "0",
+                "power": 16,
+                "pluged": true,
+                "surplus_enabled_config": true,
+                "surplus_enabled": true,
+                "load_phase": "0",
+                "logic_mode": "4"
             }
         }
     }

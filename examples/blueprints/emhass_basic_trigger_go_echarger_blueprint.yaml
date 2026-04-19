@@ -107,3 +107,14 @@ use_blueprint:
     goe_allow_charging_select: select.goe_297534_frc
     emhass_config_optimization_time_step: "15"
     automation_logger_level: INFO
+    goe_logic_mode: select.goe_297534_lmo
+    goe_grid_single_entity: sensor.scb_grid_power
+    goe_grid_consumption_entity: sensor.scb_home_power_from_grid
+    goe_battery_entity: sensor.scb_battery_power
+    goe_load_phase_sensor: select.goe_297534_psm
+    goe_surplus_sensor: switch.goe_297534_fup
+    goe_pv_entities:
+      - sensor.scb_sum_power_of_all_pv_dc_inputs
+    goe_pv_surplus_enabled: >-
+      {{ now().dst() is not none and now().dst().seconds > 0 and
+      is_state('sun.sun', 'above_horizon') }}
