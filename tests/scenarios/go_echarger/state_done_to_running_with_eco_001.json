@@ -1,5 +1,5 @@
 {
-    "_comment": "This is the basic test for the done to wait (eco) state.",
+    "_comment": "This is the basic test for the done to running (eco) state.",
     "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
     "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
     "overrides": {
@@ -26,13 +26,13 @@
     "expected": {
         "context": {
             "action_needed": true,
-            "target_status": "wait",
+            "target_status": "running",
             "target_json": {
-                "us": "wait",
+                "us": "running",
                 "ho": 0.25,
                 "st": 0,
                 "ss": 1773478800,
-                "needs_optim": true
+                "needs_optim": false
             },
             "sensor": {
                 "value_switch": "off"

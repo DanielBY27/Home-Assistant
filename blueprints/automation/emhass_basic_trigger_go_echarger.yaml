@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller for go-echarger (v202604)
+  name: EMHASS Deferrable Load Controller for go-echarger (v202605)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -527,7 +527,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202604
+  blueprint_version: v202605
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -1148,6 +1148,8 @@ actions:
           {% set res.goe_logic_mode = "4"  %}
           {% set res.goe_load_phase = "0" %}
           {% set res.goe_surplus = true %}
+          {% set res.new_us = "running" %}
+          {% set res.target_status = res.new_us %}
         {% endif %}
 
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}

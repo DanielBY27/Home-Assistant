@@ -1,0 +1,40 @@
+{
+    "_comment": "This is the basic test for the running to done (eco) state.",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
+    "overrides": {
+        "input_select.wallbox_emhass_status": "running",
+        "goe_pv_surplus_enabled": "true",
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"running\",\"ss\":1773480600,\"needs_optim\":false}",
+        "sensor.p_deferrable1": {
+            "state": "4140",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "select.goe_allow_charging": "0",
+        "number.goe_requested_current": "6",
+        "binary_sensor.goe_car_plugged": "off",
+        "select.goe_297534_lmo": "4",
+        "select.goe_297534_psm": "0",
+        "switch.goe_297534_fup": true
+    },
+    "trigger": {
+        "id": "goe_pluged_binary_sensor_state_changed",
+        "entity_id": "binary_sensor.goe_car_plugged"
+    },
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "done",
+            "goe": {
+                "charging": "1",
+                "power": 6,
+                "surplus_enabled_config": true,
+                "surplus_enabled": false,
+                "load_phase": "0",
+                "logic_mode": "3"
+            }
+        }
+    }
+}
