@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Basic Automation Controller (v202604)
+  name: EMHASS Basic Automation Controller (v202606)
   description: |
     This blueprint acts as the central controller for the EMHASS (Energy Management Optimization for Home Assistant) integration.
     It is the **only** automation that should communicate directly with the EMHASS add-on.
@@ -973,7 +973,7 @@ blueprint:
 # --------------------
 
 variables:
-  blueprint_version: v202604
+  blueprint_version: v202606
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count
@@ -1106,6 +1106,28 @@ variables:
       {{ [single_value] * count }}
     {% endif %}
   list_emhass_deferrable_loads: !input list_emhass_deferrable_loads
+  emhass_config_adjusted_pv_model_max_age: 24
+  emhass_config_battery_soc_deficit_cost: 0
+  emhass_config_battery_soc_deficit_threshold: 0.4
+  emhass_config_battery_stress_cost: 0
+  emhass_config_battery_stress_segments: 10
+  emhass_config_heat_topology: null
+  emhass_config_ignore_pv_feedback_during_curtailment: false
+  emhass_config_influxdb_database: "homeassistant"
+  emhass_config_influxdb_host: "localhost"
+  emhass_config_influxdb_measurement: "W"
+  emhass_config_influxdb_port: 8086
+  emhass_config_influxdb_retention_policy: "autogen"
+  emhass_config_influxdb_use_ssl: false
+  emhass_config_influxdb_verify_ssl: false
+  emhass_config_is_electric_load: [true, true]
+  emhass_config_lp_solver_mip_rel_gap: 0
+  emhass_config_sensor_power_photovoltaics_forecast: "sensor.p_pv_forecast"
+  emhass_config_ssl_no_verify: false
+  emhass_config_use_influxdb: false
+  emhass_config_use_websocket: false
+  emhass_config_inverter_stress_cost: 0
+  emhass_config_inverter_stress_segments: 10
 
   # Read in all currently available values and save it read-only in this variable
   snapshot: >
@@ -1400,7 +1422,7 @@ actions:
             'number_of_deferrable_loads': trigger_objs | length,
             'force_update_data': emhass_config_force_update_data,
             'get_data_from_home_assistant': emhass_config_get_data_from_home_assistant,
-            'set_deferrable_max_startups': [0,0,0,0,0,0]
+            'set_deferrable_max_startups': ([0] * (trigger_objs | length))
           },
           'publish': {
             'force_update_data': emhass_config_force_update_data,
@@ -1487,7 +1509,31 @@ actions:
             'set_deferrable_startup_penalty': trigger_objs | map(attribute='pe') | list,
             'start_timesteps_of_each_deferrable_load': trigger_objs | map(attribute='st') | list,
             'treat_deferrable_load_as_semi_cont': trigger_objs | map(attribute='se') | list,
-            'set_deferrable_max_startups': [0,0,0,0,0,0]
+            'set_deferrable_max_startups': ([0] * (trigger_objs | length)),
+            'adjusted_pv_model_max_age': emhass_config_adjusted_pv_model_max_age,
+            'battery_soc_deficit_cost': emhass_config_battery_soc_deficit_cost,
+            'battery_soc_deficit_threshold': emhass_config_battery_soc_deficit_threshold,
+            'battery_stress_cost': emhass_config_battery_stress_cost,
+            'battery_stress_segments': emhass_config_battery_stress_segments,
+            'deferrable_load_max_cost': ([0] * (trigger_objs | length)),
+            'cost_forecast_per_deferrable_load': (["null"] * (trigger_objs | length)),
+            'heat_topology': emhass_config_heat_topology,
+            'ignore_pv_feedback_during_curtailment': emhass_config_ignore_pv_feedback_during_curtailment,
+            'influxdb_database': emhass_config_influxdb_database,
+            'influxdb_host': emhass_config_influxdb_host,
+            'influxdb_measurement': emhass_config_influxdb_measurement,
+            'influxdb_port': emhass_config_influxdb_port,
+            'influxdb_retention_policy': emhass_config_influxdb_retention_policy,
+            'influxdb_use_ssl': emhass_config_influxdb_use_ssl,
+            'influxdb_verify_ssl': emhass_config_influxdb_verify_ssl,
+            'is_electric_load': emhass_config_is_electric_load,
+            'lp_solver_mip_rel_gap': emhass_config_lp_solver_mip_rel_gap,
+            'sensor_power_photovoltaics_forecast': emhass_config_sensor_power_photovoltaics_forecast,
+            'ssl_no_verify': emhass_config_ssl_no_verify,
+            'use_influxdb': emhass_config_use_influxdb,
+            'use_websocket': emhass_config_use_websocket,
+            'inverter_stress_cost': emhass_config_inverter_stress_cost,
+            'inverter_stress_segments': emhass_config_inverter_stress_segments
           },
           'forecast': config.emhass_ml_forecast_json_default | combine(config.emhass_ml_forecast_json_overwrite),
           'action_needed': (res.optim_enabled or res.publish_enabled or res.save_enabled or res.forecast_enabled)
