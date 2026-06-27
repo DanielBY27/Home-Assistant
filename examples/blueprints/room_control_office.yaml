@@ -25,3 +25,14 @@ use_blueprint:
       seconds: 0
     blind_close_latest: "21:33:00"
     blind_setup: default
+    blind_shading_template: |-
+      {% set temp_inside = state_attr('climate.buro_thermostat', 'current_temperature') | float(0) %}
+      {% set temp_outside = [states('sensor.thermometer_garden_temperatur') | float(0),
+                            states('sensor.motion_detector_outside_hue_temperatur') | float(0)] | max %}
+      {% set lx_outside = states('sensor.motion_detector_outside_hue_beleuchtungsstarke') | float(0) %}
+      {{
+        temp_outside > temp_inside and
+        today_at('06:00') <= now() <= today_at('14:00') and
+        (temp_inside >= 20 or lx_outside >= 10000)
+      }}
+    blind_pos_shading: 40

@@ -26,3 +26,5 @@ use_blueprint:
       seconds: 0
     blind_close_latest: "21:30:00"
     blind_setup: vent_disabled_open
+    is_presence_change_enabled: "[[1, 2, 3, 4, 5, 9, 10, 11, 12]]"
+    blind_pos_shading: 40

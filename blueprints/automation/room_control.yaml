@@ -1,5 +1,5 @@
 blueprint:
-  name: Room Control (v202601)
+  name: Room Control (v202607)
   description: |
     Comprehensive room control automation that manages heating and roller shutters based on presence, window status, and sun position.
 
@@ -88,6 +88,18 @@ blueprint:
           default: 25
           selector:
             number: {min: 0, max: 100, mode: box}
+        blind_pos_shading:
+          name: 'Target Position: Shading'
+          description: 'Position to move to when the shading formula is true (0-100%). Default: 50.'
+          default: 50
+          selector:
+            number: {min: 0, max: 100, mode: box}
+        is_presence_change_enabled:
+          name: 'Presence change enabled on Months'
+          description: 'Define a JSON array containing month numbers for which presence changes are enabled. Use a nested array in the order of the selected blinds. (Default: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]]).'
+          default: '[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]]'
+          selector:
+            text: {}
         blind_setup:
            name: Ventilation Logic Mode
            description: |
@@ -150,6 +162,13 @@ blueprint:
           default: '00:00:00'
           selector:
             duration: {}
+        blind_shading_template:
+          name: 'Template for shading calculation'
+          description: 'Template for calculation: Is shading activated or not (Default: false)'
+          default: 'false'
+          selector:
+            text:
+              multiline: true
 
     heating_config:
       name: Heating Control
@@ -187,7 +206,7 @@ blueprint:
 # ----------------------------------
 
 variables:
-  blueprint_version: v202601
+  blueprint_version: v202607
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   tmp_entity_window: !input window_entity
   tmp_entity_presence: !input present_entity
@@ -197,6 +216,7 @@ variables:
   tmp_entity_blind_open: !input blind_pos_open
   tmp_entity_blind_close: !input blind_pos_close
   tmp_entity_blind_vent: !input blind_pos_vent
+  tmp_entity_blind_shading: !input blind_pos_shading
   tmp_entity_blind_setup: !input blind_setup
   tmp_entity_blind_open_earliest: !input blind_open_earliest
   tmp_entity_blind_open_offset_direction: !input blind_open_offset_direction
@@ -205,6 +225,11 @@ variables:
   tmp_entity_blind_close_offset_direction: !input blind_close_offset_direction
   tmp_entity_blind_close_offset_time: !input blind_close_offset_time
   tmp_entity_blind_allow_opening_at_home: !input blind_allow_opening_at_home
+  tmp_entity_blind_is_presence_change_enabled: !input is_presence_change_enabled
+  tmp_entity_blind_shading_template_raw: !input blind_shading_template
+  tmp_entity_blind_shading_template: >
+    {% set raw_value = tmp_entity_blind_shading_template_raw | default(false) %}
+    {{ raw_value | bool }}
 
 # ---------------------------------
 # --- Room Control Trigger Triggers
@@ -250,6 +275,17 @@ triggers:
   - trigger: state
     entity_id: !input window_entity
     id: "t_window"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    from:
+      - "on"
+    to:
+      - "off"
+  - trigger: state
+    entity_id: !input window_entity
+    id: "t_window"
     not_to:
       - unknown
       - unavailable
@@ -274,6 +310,11 @@ triggers:
       seconds: 0
     to:
       - not_home
+  - trigger: time_pattern
+    id: "t_cron_hourly"
+    hours: /1
+    seconds: "0"
+    minutes: "2"
 
 # -----------------------------------
 # --- Room Control Trigger Conditions
@@ -293,6 +334,7 @@ actions:
         {% set now_dt = now() %}
         {% set current_month = now_dt.month | int %}
         {% set heating_month = (tmp_entity_heating_month | default('9, 10, 11, 12, 1, 2, 3, 4') | string).split(',') | map('trim') | map('int') | list %}
+        {% set blind_presence_change_month_default = tmp_entity_blind_is_presence_change_enabled | from_json | default([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], true) %}
 
         {% set raw_o = tmp_entity_blind_open_offset_time %}
         {% if raw_o is mapping %}
@@ -322,6 +364,7 @@ actions:
 
         {% set snapshot_base = {
           'current_time': now_dt | as_datetime | as_local | string,
+          'current_month': current_month,
           'entity_window_ids': tmp_entity_window,
           'entity_presence': tmp_entity_presence,
           'entity_heating': tmp_entity_heating,
@@ -331,6 +374,7 @@ actions:
           'entity_blind_open': tmp_entity_blind_open | default(100) | int(100),
           'entity_blind_close': tmp_entity_blind_close | default(0) | int(0),
           'entity_blind_vent': tmp_entity_blind_vent | default(25) | int(25),
+          'entity_blind_shading': tmp_entity_blind_shading | default(50) | int(50),
           'entity_blind_open_earliest': tmp_entity_blind_open_earliest | default('06:30:00') | string,
           'entity_blind_open_offset_direction': tmp_entity_blind_open_offset_direction | default('after') | string,
           'entity_blind_open_offset_time': tmp_entity_blind_open_offset_time | default('00:00:00') | string,
@@ -341,7 +385,9 @@ actions:
           'entity_blind_sun_close_time': final_close | string,
           'entity_blind_is_day_phase': (final_open <= now_dt < final_close) | bool,
           'entity_blind_allow_opening_at_home': tmp_entity_blind_allow_opening_at_home | bool,
-          'entity_blind_setup_raw': tmp_entity_blind_setup | default('default') | string
+          'entity_blind_setup_raw': tmp_entity_blind_setup | default('default') | string,
+          'entity_blind_presence_change_month_default': blind_presence_change_month_default,
+          'entity_blind_shading_enabled': tmp_entity_blind_shading_template
         } %}
 
         {% set ns = namespace(
@@ -410,48 +456,73 @@ actions:
           {% set specific_window_open = config.window_states_list[i] if i < config.window_states_list|length else false %}
           {% set specific_setup = setup_list[i] if i < setup_list|length else (setup_list[0] | default('default')) %}
           {% set target = current_pos %}
+          {% set entity_blind_presence_change_enabled = false %}
+          {% if config.entity_blind_presence_change_month_default is defined and
+              config.entity_blind_presence_change_month_default | length > i and
+              config.entity_blind_presence_change_month_default[i] is defined and
+              config.entity_blind_presence_change_month_default[i] | length > 0
+          %}
+            {% set entity_blind_presence_change_enabled = config.current_month in config.entity_blind_presence_change_month_default[i] %}
+          {% endif %}
 
-          {% if automation_trigger_id in ['t_morning', 't_present', 'none'] and
+          {% if automation_trigger_id in ['t_present', 't_cron_hourly'] and
+              entity_blind_presence_change_enabled == false
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind nothing (100) presence change is disabled by trigger id ' ~ automation_trigger_id] %}
+          {% elif automation_trigger_id in ['t_morning', 't_present', 't_cron_hourly', 'none'] and
+              config.entity_blind_is_day_phase == true and
+              config.entity_blind_shading_enabled == true and
+              entity_blind_presence_change_enabled == true and
+              specific_setup == 'default' and
+              (
+                config.entity_blind_allow_opening_at_home == true or
+                config.entity_presence_is_enabled == false or
+                config.blind_current_pos_list[i] == config.entity_blind_open
+              )
+          %}
+            {% set res.log_msg = res.log_msg + ['Blind shading (200) by trigger id ' ~ automation_trigger_id] %}
+            {% set target = config.entity_blind_shading %}
+          {% elif automation_trigger_id in ['t_morning', 't_present', 't_cron_hourly', 'none'] and
               config.entity_blind_is_day_phase == true and
               (
                 config.entity_blind_allow_opening_at_home == true or
                 config.entity_presence_is_enabled == false
               )
           %}
-            {% set res.log_msg = res.log_msg + ['Blind open (100) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind open (300) by trigger id ' ~ automation_trigger_id] %}
             {% set target = config.entity_blind_open %}
           {% elif automation_trigger_id in ['t_evening', 'none'] and
               config.entity_blind_is_day_phase == false and
               specific_window_open == false
           %}
-            {% set res.log_msg = res.log_msg + ['Blind close (200) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind close (400) by trigger id ' ~ automation_trigger_id] %}
             {% set target = config.entity_blind_close %}
           {% elif automation_trigger_id in ['t_evening', 't_window', 'none'] and
               config.entity_blind_is_day_phase == false and
               specific_window_open == true and
               specific_setup == 'default'
           %}
-            {% set res.log_msg = res.log_msg + ['Blind ventilation (300) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind ventilation (500) by trigger id ' ~ automation_trigger_id] %}
             {% set target = config.entity_blind_vent %}
           {% elif automation_trigger_id in ['t_evening', 'none'] and
               config.entity_blind_is_day_phase == false and
               specific_window_open == true and
               specific_setup == 'vent_disabled'
           %}
-            {% set res.log_msg = res.log_msg + ['Blind close (210) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind close (510) by trigger id ' ~ automation_trigger_id] %}
             {% set target = config.entity_blind_close %}
           {% elif automation_trigger_id in ['t_evening', 'none'] and
               config.entity_blind_is_day_phase == false and
               specific_window_open == true and
               specific_setup == 'vent_disabled_open'
           %}
-            {% set res.log_msg = res.log_msg + ['Blind nothing config is vent_disabled_open (220) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind nothing config is vent_disabled_open (520) by trigger id ' ~ automation_trigger_id] %}
           {% elif automation_trigger_id in ['t_window', 'none'] and
               config.entity_blind_is_day_phase == false and
               specific_window_open == false and
               specific_setup == 'default'
           %}
-            {% set res.log_msg = res.log_msg + ['Blind close (220) by trigger id ' ~ automation_trigger_id] %}
+            {% set res.log_msg = res.log_msg + ['Blind close (600) by trigger id ' ~ automation_trigger_id] %}
             {% set target = config.entity_blind_close %}
           {% else %}
             {% set res.log_msg = res.log_msg + ['Blind nothing (999) by trigger id ' ~ automation_trigger_id] %}
