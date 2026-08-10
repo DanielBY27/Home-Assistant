@@ -13,6 +13,11 @@ tests/debug_*.py
 tests/*.txt
 tests/__pycache__/
 
+# Credentials & Tokens
+credentials/
+*.token.json
+token.json
+
 # IDE/Editor
 .vscode/ # VS Code Workspace-Einstellungen
 .idea/ # JetBrains IDEs

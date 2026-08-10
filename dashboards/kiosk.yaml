@@ -1,0 +1,1366 @@
+button_card_templates:
+  nav_base:
+    color_type: icon
+    styles:
+      card:
+        - border-radius: 14px
+        - border: none
+        - box-shadow: none
+        - transition: all 0.2s ease-in-out
+      icon:
+        - width: 28px
+      name:
+        - font-weight: 500
+        - font-size: 11px
+        - margin-top: 6px
+  sidebar_item:
+    template: nav_base
+    styles:
+      card:
+        - width: 75px
+        - height: 75px
+        - background: |
+            [[[
+              return variables.active ? 'rgba(3, 169, 244, 0.2)' : 'rgba(255, 255, 255, 0.03)'
+            ]]]
+        - margin: 0 auto 12px auto
+        - border: |
+            [[[
+              return variables.active ? '1px solid rgba(3, 169, 244, 0.5)' : '1px solid rgba(255, 255, 255, 0.05)'
+            ]]]
+      icon:
+        - color: |
+            [[[
+              return variables.active ? '#03a9f4' : 'rgba(255, 255, 255, 0.4)'
+            ]]]
+      name:
+        - color: |
+            [[[
+              return variables.active ? 'white' : 'rgba(255, 255, 255, 0.4)'
+            ]]]
+    extra_styles: |
+      @media (max-width: 768px) {
+        #card {
+          width: 65px !important;
+          height: 50px !important;
+          margin: 0 !important;
+        }
+        #icon {
+          width: 18px !important;
+        }
+        #name {
+          font-size: 9px !important;
+          margin-top: 2px !important;
+        }
+      }
+    tap_action:
+      action: navigate
+      navigation_path: '[[[ return variables.path ]]]'
+  person_sidebar_item:
+    template: sidebar_item
+    show_entity_picture: true
+    styles:
+      entity_picture:
+        - border-radius: 50%
+        - width: 36px
+        - height: 36px
+        - margin: 0 auto
+        - border: |
+            [[[
+              return states[entity.entity_id].state === 'home' ? '2px solid #4caf50' : '2px solid rgba(255,255,255,0.2)';
+            ]]]
+        - filter: |
+            [[[
+              return states[entity.entity_id].state === 'home' ? 'none' : 'grayscale(100%)';
+            ]]]
+  category_item:
+    template: nav_base
+    styles:
+      card:
+        - height: 42px
+        - border-radius: 21px
+        - padding: 0 16px
+        - background: |
+            [[[
+              return variables.active ? '#03a9f4' : 'rgba(255, 255, 255, 0.08)'
+            ]]]
+        - border: |
+            [[[
+              return variables.active ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'
+            ]]]
+      icon:
+        - color: white
+        - width: 18px
+      grid:
+        - grid-template-areas: '"i n"'
+        - grid-template-columns: 28px 1fr
+      name:
+        - color: white
+        - justify-self: start
+        - margin-top: 0
+        - font-size: 13px
+    tap_action:
+      action: navigate
+      navigation_path: '[[[ return variables.path ]]]'
+  camera_card:
+    aspect_ratio: 16/9
+    show_entity_picture: true
+    show_name: true
+    styles:
+      card:
+        - border-radius: 20px
+        - overflow: hidden
+        - background: black
+        - padding: 0px !important
+      grid:
+        - grid-template-areas: '"i"'
+        - grid-template-columns: 100%
+        - grid-template-rows: 100%
+      entity_picture:
+        - width: 100%
+        - height: 100%
+        - object-fit: cover
+        - object-position: center
+      name:
+        - position: absolute
+        - bottom: 10px
+        - left: 15px
+        - color: white
+        - font-size: 14px
+        - text-shadow: 1px 1px 3px rgba(0,0,0,0.8)
+    variables:
+      refresh_trigger: none
+    entity_picture: |
+      [[[
+        const url = states[entity.entity_id].attributes.entity_picture;
+        return url ? `${url}&v=${variables.refresh_trigger}` : '';
+      ]]]
+  status_chip:
+    template: nav_base
+    styles:
+      card:
+        - height: 36px
+        - border-radius: 18px
+        - padding: 0 12px
+        - background: rgba(255, 255, 255, 0.08)
+        - border: 1px solid rgba(255, 255, 255, 0.1)
+        - width: auto
+      grid:
+        - grid-template-areas: '"i n"'
+        - grid-template-columns: 24px auto
+      icon:
+        - width: 16px
+        - color: |
+            [[[
+              if (variables.color) return variables.color;
+              return 'white';
+            ]]]
+      name:
+        - font-size: 12px
+        - color: white
+        - justify-self: start
+        - margin-top: 0
+  appliance_circle_card:
+    template: nav_base
+    show_name: true
+    styles:
+      card:
+        - width: 75px
+        - height: 75px
+        - border-radius: 50%
+        - background: |
+            [[[
+              const s = states[entity.entity_id].state;
+              if (s === 'running' || s === 'force') return 'rgba(76, 175, 80, 0.15)';
+              if (s === 'wait') return 'rgba(255, 193, 7, 0.15)';
+              return 'rgba(255, 255, 255, 0.03)';
+            ]]]
+        - border: |
+            [[[
+              const s = states[entity.entity_id].state;
+              if (s === 'running' || s === 'force') return '2px solid #4caf50';
+              if (s === 'wait') return '2px solid #ffc107';
+              return '1px solid rgba(255, 255, 255, 0.1)';
+            ]]]
+      icon:
+        - color: |
+            [[[
+              const s = states[entity.entity_id].state;
+              if (s === 'running' || s === 'force') return '#4caf50';
+              if (s === 'wait') return '#ffc107';
+              return 'rgba(255, 255, 255, 0.4)';
+            ]]]
+        - animation: |
+            [[[
+              const s = states[entity.entity_id].state;
+              if (s === 'running' || s === 'force') return 'rotating 3s linear infinite';
+              return 'none';
+            ]]]
+      name:
+        - font-size: 9px
+        - font-weight: 600
+        - color: white
+        - margin-top: 2px
+    tap_action:
+      action: |
+        [[[
+          return states[entity.entity_id].state === 'wait' ? 'perform-action' : 'none';
+        ]]]
+      perform_action: input_select.select_option
+      target:
+        entity_id: '[[[ return entity.entity_id ]]]'
+      data:
+        option: force
+  sidebar_layout:
+    styles:
+      card:
+        - background: transparent
+        - border: none
+        - box-shadow: none
+        - padding: 20px 0
+      grid:
+        - grid-template-areas: |
+            "home"
+            "wohnen"
+            "kueche"
+            "parents"
+            "stefan"
+            "simon"
+            "lukas"
+            "buero"
+            "garage"
+            "energie"
+        - grid-template-columns: 1fr
+        - grid-template-rows: repeat(10, 85px)
+        - gap: 12px
+    extra_styles: |
+      @media (max-width: 768px) {
+        #card {
+          padding: 0 !important;
+          height: auto !important;
+          width: 100% !important;
+        }
+        #container {
+          grid-template-areas: none !important;
+          display: flex !important;
+          flex-flow: row wrap !important;
+          justify-content: space-around !important;
+          gap: 6px !important;
+          padding: 5px !important;
+        }
+      }
+    custom_fields:
+      home:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:home-variant
+          name: Home
+          variables:
+            active: '[[[ return variables.active_room == "home" ]]]'
+            path: home
+      wohnen:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:sofa
+          name: Wohnen
+          variables:
+            active: '[[[ return variables.active_room == "wohnen" ]]]'
+            path: wohnzimmer
+      kueche:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:fridge
+          name: Küche
+          variables:
+            active: '[[[ return variables.active_room == "kueche" ]]]'
+            path: kueche
+      parents:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          entity: person.daniel
+          name: Eltern
+          variables:
+            active: '[[[ return variables.active_room == "parents" ]]]'
+            path: parents
+          show_entity_picture: true
+          styles:
+            entity_picture:
+              - border-radius: 50%
+              - width: 36px
+              - height: 36px
+              - margin: 0 auto
+              - border: |
+                  [[[
+                    const h1 = states['person.daniel'].state === 'home';
+                    const h2 = states['person.tanja'].state === 'home';
+                    return (h1 || h2) ? '2px solid #4caf50' : '2px solid rgba(255,255,255,0.2)';
+                  ]]]
+              - filter: |
+                  [[[
+                    const h1 = states['person.daniel'].state === 'home';
+                    const h2 = states['person.tanja'].state === 'home';
+                    return (h1 || h2) ? 'none' : 'grayscale(100%)';
+                  ]]]
+          custom_fields:
+            presence: |
+              [[[
+                var count = 0;
+                if (states['person.daniel'].state === 'home') count++;
+                if (states['person.tanja'].state === 'home') count++;
+                return count;
+              ]]]
+          extra_styles: |
+            #presence {
+              position: absolute;
+              top: 4px;
+              right: 4px;
+              background: #4caf50;
+              color: white;
+              border-radius: 50%;
+              width: 16px;
+              height: 16px;
+              font-size: 10px;
+              font-weight: bold;
+              line-height: 16px;
+              text-align: center;
+            }
+            @media (max-width: 768px) {
+              #presence {
+                top: 2px;
+                right: 2px;
+                width: 14px;
+                height: 14px;
+                font-size: 9px;
+                line-height: 14px;
+              }
+              #card {
+                width: 65px !important;
+                height: 50px !important;
+                margin: 0 !important;
+              }
+            }
+      stefan:
+        card:
+          type: custom:button-card
+          template: person_sidebar_item
+          entity: person.stefan
+          name: Stefan
+          variables:
+            active: '[[[ return variables.active_room == "stefan" ]]]'
+            path: stefan
+      simon:
+        card:
+          type: custom:button-card
+          template: person_sidebar_item
+          entity: person.simon
+          name: Simon
+          variables:
+            active: '[[[ return variables.active_room == "simon" ]]]'
+            path: simon
+      lukas:
+        card:
+          type: custom:button-card
+          template: person_sidebar_item
+          entity: person.lukas
+          name: Lukas
+          variables:
+            active: '[[[ return variables.active_room == "lukas" ]]]'
+            path: lukas
+      buero:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:office-chair
+          name: Büro
+          variables:
+            active: '[[[ return variables.active_room == "buero" ]]]'
+            path: buero
+      garage:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:garage
+          name: Garage
+          variables:
+            active: '[[[ return variables.active_room == "garage" ]]]'
+            path: garage
+      energie:
+        card:
+          type: custom:button-card
+          template: sidebar_item
+          icon: mdi:flash
+          name: Energie
+          variables:
+            active: '[[[ return variables.active_room == "energie" ]]]'
+            path: energie
+views:
+  - title: Home
+    path: home
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: home
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                card_mod:
+                  style: |
+                    div#root {
+                      display: flex !important;
+                      justify-content: space-between !important;
+                      align-items: center !important;
+                      width: 100% !important;
+                      padding: 20px 24px 10px 24px;
+                    }
+                cards:
+                  - type: horizontal-stack
+                    cards:
+                      - type: custom:button-card
+                        template: status_chip
+                        entity: sensor.ccu3_webui_servicemeldungen
+                        name: |
+                          [[[
+                            return states['sensor.ccu3_webui_servicemeldungen'].state + ' CCU Fehler';
+                          ]]]
+                        icon: mdi:alert-circle
+                        variables:
+                          color: '#f44336'
+                        show_name: true
+                        tap_action:
+                          action: navigate
+                          navigation_path: /homematic-config#tab=integration&view=integration-dashboard
+                        visibility:
+                          - condition: numeric_state
+                            entity: sensor.ccu3_webui_servicemeldungen
+                            above: 0
+                      - type: custom:button-card
+                        template: status_chip
+                        entity: sensor.abholung_papier
+                        name: |
+                          [[[
+                            return states['sensor.abholung_papier'].state + ' Tage bis Papier';
+                          ]]]
+                        icon: mdi:recycle
+                        variables:
+                          color: '#3498db'
+                        show_name: true
+                        visibility:
+                          - condition: numeric_state
+                            entity: sensor.abholung_papier
+                            below: 4
+                      - type: custom:button-card
+                        template: status_chip
+                        entity: sensor.abholung_restmull
+                        name: |
+                          [[[
+                            return states['sensor.abholung_restmull'].state + ' Tage bis Restmüll';
+                          ]]]
+                        icon: mdi:trash-can
+                        variables:
+                          color: '#8b4513'
+                        show_name: true
+                        visibility:
+                          - condition: numeric_state
+                            entity: sensor.abholung_restmull
+                            below: 4
+                  - type: custom:button-card
+                    name: |
+                      [[[
+                        return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                      ]]]
+                    show_name: true
+                    show_icon: false
+                    styles:
+                      card:
+                        - background: transparent
+                        - border: none
+                        - box-shadow: none
+                        - width: auto
+                      name:
+                        - font-size: 24px
+                        - font-weight: bold
+                        - color: rgba(255, 255, 255, 0.9)
+              - type: custom:button-card
+                styles:
+                  card:
+                    - background: transparent
+                    - border: none
+                    - box-shadow: none
+                    - padding: 0
+                    - margin: 16px 24px 0 24px
+                  grid:
+                    - grid-template-areas: '"entryway backyard"'
+                    - grid-template-columns: |
+                        [[[
+                          return states['input_boolean.large_garden_camera'] && states['input_boolean.large_garden_camera'].state === 'on' ? '1fr 3fr' : '3fr 1fr';
+                        ]]]
+                    - gap: 16px
+                custom_fields:
+                  entryway:
+                    card:
+                      type: custom:button-card
+                      template: camera_card
+                      entity: camera.entryway
+                      name: Eingang
+                      aspect_ratio: |
+                        [[[
+                          return states['input_boolean.large_garden_camera'] && states['input_boolean.large_garden_camera'].state === 'on' ? '4/3' : '21/9';
+                        ]]]
+                      tap_action:
+                        action: |
+                          [[[
+                            return states['input_boolean.large_garden_camera'] && states['input_boolean.large_garden_camera'].state === 'on' ? 'perform-action' : 'none';
+                          ]]]
+                        perform_action: input_boolean.turn_off
+                        target:
+                          entity_id: input_boolean.large_garden_camera
+                  backyard:
+                    card:
+                      type: custom:button-card
+                      template: camera_card
+                      entity: camera.backyard
+                      name: Garten
+                      aspect_ratio: |
+                        [[[
+                          return states['input_boolean.large_garden_camera'] && states['input_boolean.large_garden_camera'].state === 'on' ? '21/9' : '4/3';
+                        ]]]
+                      tap_action:
+                        action: |
+                          [[[
+                            return states['input_boolean.large_garden_camera'] && states['input_boolean.large_garden_camera'].state === 'off' ? 'perform-action' : 'none';
+                          ]]]
+                        perform_action: input_boolean.turn_on
+                        target:
+                          entity_id: input_boolean.large_garden_camera
+              - type: custom:button-card
+                styles:
+                  card:
+                    - background: rgba(255, 255, 255, 0.04)
+                    - border-radius: 24px
+                    - border: 1px solid rgba(255, 255, 255, 0.08)
+                    - padding: 24px
+                    - margin: 16px 24px
+                  grid:
+                    - grid-template-areas: |
+                        "wash dish dryer"
+                        "water pv_center battery"
+                        "power_grid car empty"
+                    - grid-template-columns: repeat(3, 1fr)
+                    - grid-template-rows: repeat(3, 1fr)
+                    - gap: 20px
+                    - align-items: center
+                    - justify-items: center
+                custom_fields:
+                  pv_center:
+                    card:
+                      type: custom:button-card
+                      entity: sensor.scb_sum_power_of_all_pv_dc_inputs
+                      name: Solar PV
+                      show_state: true
+                      icon: mdi:solar-power
+                      styles:
+                        card:
+                          - background: rgba(255, 193, 7, 0.12)
+                          - border: 2px solid rgba(255, 193, 7, 0.4)
+                          - border-radius: 50%
+                          - width: 110px
+                          - height: 110px
+                        icon:
+                          - color: '#ffc107'
+                          - width: 40px
+                        name:
+                          - font-size: 11px
+                          - font-weight: bold
+                          - color: white
+                        state:
+                          - font-size: 13px
+                          - font-weight: 600
+                          - color: '#ffc107'
+                  wash:
+                    card:
+                      type: custom:button-card
+                      template: appliance_circle_card
+                      entity: input_select.washing_machine_emhass_status
+                      name: Wasch
+                      icon: mdi:washing-machine
+                      styles:
+                        card:
+                          - display: |
+                              [[[
+                                return states['input_select.washing_machine_emhass_status'].state === 'done' ? 'none' : 'block';
+                              ]]]
+                  dish:
+                    card:
+                      type: custom:button-card
+                      template: appliance_circle_card
+                      entity: input_select.dishwasher_emhass_status
+                      name: Spüler
+                      icon: mdi:dishwasher
+                      styles:
+                        card:
+                          - display: |
+                              [[[
+                                return states['input_select.dishwasher_emhass_status'].state === 'done' ? 'none' : 'block';
+                              ]]]
+                  dryer:
+                    card:
+                      type: custom:button-card
+                      template: appliance_circle_card
+                      entity: input_select.tumble_dryer_emhass_status
+                      name: Trockner
+                      icon: mdi:tumble-dryer
+                      styles:
+                        card:
+                          - display: |
+                              [[[
+                                return states['input_select.tumble_dryer_emhass_status'].state === 'done' ? 'none' : 'block';
+                              ]]]
+                  water:
+                    card:
+                      type: custom:button-card
+                      template: appliance_circle_card
+                      entity: input_select.water_bioler_emhass_status
+                      name: Wasser
+                      icon: mdi:water-boiler
+                      styles:
+                        card:
+                          - display: |
+                              [[[
+                                return states['input_select.water_bioler_emhass_status'].state === 'done' ? 'none' : 'block';
+                              ]]]
+                  battery:
+                    card:
+                      type: custom:button-card
+                      template: appliance_circle_card
+                      entity: input_select.pv_battery_emhass_status
+                      name: PV Akku
+                      icon: mdi:battery-clock
+                      styles:
+                        card:
+                          - display: |
+                              [[[
+                                return states['input_select.pv_battery_emhass_status'].state === 'done' ? 'none' : 'block';
+                              ]]]
+                  car:
+                    card:
+                      type: custom:button-card
+                      entity: input_select.wallbox_emhass_status
+                      name: Wallbox
+                      icon: mdi:ev-station
+                      show_state: false
+                      styles:
+                        card:
+                          - background: rgba(3, 169, 244, 0.08)
+                          - border-radius: 16px
+                          - padding: 12px
+                          - border: 1px solid rgba(3, 169, 244, 0.2)
+                          - display: |
+                              [[[
+                                return states['binary_sensor.goe_297534_car_0'] && states['binary_sensor.goe_297534_car_0'].state === 'on' ? 'block' : 'none';
+                              ]]]
+                        grid:
+                          - grid-template-areas: '"i n" "power power" "status status"'
+                          - grid-template-columns: 24px 1fr
+                          - grid-template-rows: auto auto auto
+                        icon:
+                          - color: '#03a9f4'
+                          - width: 22px
+                        name:
+                          - font-size: 10px
+                          - color: rgba(255, 255, 255, 0.5)
+                          - justify-self: start
+                      custom_fields:
+                        power: |
+                          [[[
+                            const p = states['sensor.goe_297534_nrg_11'] ? parseFloat(states['sensor.goe_297534_nrg_11'].state) : 0;
+                            return `<div style="font-size: 12px; font-weight: bold; color: white; margin-top: 4px;">${(p/1000).toFixed(1)} kW</div>`;
+                          ]]]
+                        status: |
+                          [[[
+                            const s = states['input_select.wallbox_emhass_status'].state;
+                            return `<div style="font-size: 10px; color: #03a9f4; margin-top: 2px;">Status: ${s}</div>`;
+                          ]]]
+                      tap_action:
+                        action: more-info
+                  power_grid:
+                    card:
+                      type: custom:button-card
+                      entity: sensor.scb_home_power_from_grid
+                      name: Netz & Tibber
+                      icon: mdi:transmission-tower
+                      show_state: true
+                      styles:
+                        card:
+                          - background: rgba(255, 255, 255, 0.03)
+                          - border-radius: 16px
+                          - padding: 12px
+                          - border: |
+                              [[[
+                                const grid = parseFloat(states['sensor.scb_home_power_from_grid'].state);
+                                return grid < 250 ? '1px solid rgba(76, 175, 80, 0.3)' : '1px solid rgba(244, 67, 54, 0.3)';
+                              ]]]
+                        icon:
+                          - color: |
+                              [[[
+                                const grid = parseFloat(states['sensor.scb_home_power_from_grid'].state);
+                                return grid < 250 ? '#4caf50' : '#f44336';
+                              ]]]
+                          - width: 24px
+                        grid:
+                          - grid-template-areas: '"i n" "price price"'
+                          - grid-template-columns: 24px 1fr
+                          - grid-template-rows: auto auto
+                        name:
+                          - font-size: 10px
+                          - color: rgba(255, 255, 255, 0.5)
+                          - justify-self: start
+                        state:
+                          - font-size: 12px
+                          - font-weight: bold
+                          - justify-self: start
+                          - color: |
+                              [[[
+                                const grid = parseFloat(states['sensor.scb_home_power_from_grid'].state);
+                                return grid < 250 ? '#4caf50' : '#f44336';
+                              ]]]
+                      custom_fields:
+                        price: |
+                          [[[
+                            const price = parseFloat(states['sensor.tibber27a_strompreis'].state);
+                            const color = price < 0.25 ? '#4caf50' : '#f44336';
+                            return `<div style="font-size: 12px; margin-top: 8px; font-weight: bold; color: ${color}; text-align: center;">Tibber: ${price.toFixed(3)} €</div>`;
+                          ]]]
+  - title: Wohnzimmer
+    path: wohnzimmer
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: wohnen
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    icon: mdi:view-dashboard
+                    name: Übersicht
+                    template: category_item
+                    variables:
+                      active: true
+                      path: wohnzimmer
+                  - type: custom:button-card
+                    icon: mdi:thermometer
+                    name: Heizung
+                    template: category_item
+                    variables:
+                      active: false
+                      path: wohnzimmer-heizung
+                  - type: custom:button-card
+                    icon: mdi:lightbulb
+                    name: Licht
+                    template: category_item
+                    variables:
+                      active: false
+                      path: wohnzimmer-licht
+                card_mod:
+                  style: >
+                    :host { padding: 24px 24px 12px 24px; --stack-card-margin: 0
+                    12px 0 0; }
+              - type: grid
+                columns: 2
+                cards:
+                  - type: markdown
+                    content: '### Willkommen im Wohnzimmer'
+  - title: Küche
+    path: kueche
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: kueche
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Willkommen in der Küche'
+  - title: Eltern
+    path: parents
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: parents
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Elternbereich'
+  - title: Stefan
+    path: stefan
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: stefan
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Stefans Zimmer'
+  - title: Simon
+    path: simon
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: simon
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Simons Zimmer'
+  - title: Lukas
+    path: lukas
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: lukas
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Lukas Zimmer'
+  - title: Büro
+    path: buero
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: buero
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Willkommen im Büro'
+  - title: Garage
+    path: garage
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: garage
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Willkommen in der Garage'
+  - title: Energie
+    path: energie
+    type: panel
+    cards:
+      - type: horizontal-stack
+        card_mod:
+          style: |
+            :host { --stack-card-margin: 0; }
+            div#root {
+              display: grid !important;
+              grid-template-columns: 100px 1fr !important;
+              grid-template-rows: 1fr !important;
+              gap: 0 !important;
+              width: 100% !important;
+              padding: 0 1.5% !important;
+              box-sizing: border-box !important;
+            }
+            @media (max-width: 768px) {
+              div#root {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                box-sizing: border-box !important;
+              }
+            }
+            div#root > *:first-child {
+              width: 100px !important;
+              background: rgba(0, 0, 0, 0.3);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              height: 100vh;
+              margin: 0 !important;
+            }
+            div#root > *:last-child {
+              margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+              div#root > *:first-child {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 60px !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 0 0 15px 0 !important;
+                order: 1 !important;
+              }
+              div#root > *:last-child {
+                width: 100% !important;
+                margin: 0 !important;
+                order: 2 !important;
+              }
+            }
+        cards:
+          - type: custom:button-card
+            template: sidebar_layout
+            variables:
+              active_room: energie
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: '### Energiedetails'

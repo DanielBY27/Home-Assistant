@@ -1,0 +1,806 @@
+views:
+  - type: sections
+    path: verview
+    max_columns: 2
+    title: Übersicht
+    sections:
+      - type: grid
+        cards:
+          - type: conditional
+            conditions:
+              - condition: numeric_state
+                entity: sensor.abholung_restmull
+                below: 4
+            card:
+              type: tile
+              entity: sensor.abholung_restmull
+              name: Rest/Bio
+              icon: mdi:trash-can
+              color: deep-orange
+              state_content: state
+              vertical: false
+              tap_action:
+                action: none
+              features_position: bottom
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: conditional
+            conditions:
+              - condition: numeric_state
+                entity: sensor.abholung_papier
+                below: 4
+            card:
+              type: tile
+              entity: sensor.abholung_papier
+              name: Papier
+              icon: mdi:trash-can
+              color: blue
+              state_content: state
+              vertical: false
+              tap_action:
+                action: none
+              features_position: bottom
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: horizontal-stack
+            cards:
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: running
+                icon: mdi:battery-charging-20
+                name: Eco
+                show_state: false
+                grid_options:
+                  columns: 3
+                  rows: 2
+                icon_height: 50px
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') == "wait" %}
+                          yellow
+                        {% elif states('input_select.wallbox_emhass_status') == "running" %}
+                          green
+                        {% elif states('input_select.wallbox_emhass_status') == "done" %}
+                          #03a9f4
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: force-6
+                icon: mdi:battery-charging-30
+                name: 6 A
+                show_state: false
+                icon_height: 50px
+                grid_options:
+                  columns: 3
+                  rows: 2
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') in ['force', 'force-6'] %}
+                          green
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: force-10
+                icon: mdi:battery-charging-40
+                name: 10 A
+                show_state: false
+                icon_height: 50px
+                grid_options:
+                  columns: 3
+                  rows: 2
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') == "force-10" %}
+                          green
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: force-12
+                icon: mdi:battery-charging-60
+                name: 12 A
+                show_state: false
+                icon_height: 50px
+                grid_options:
+                  columns: 3
+                  rows: 2
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') == "force-12" %}
+                          green
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: force-14
+                icon: mdi:battery-charging-80
+                name: 14 A
+                show_state: false
+                icon_height: 50px
+                grid_options:
+                  columns: 3
+                  rows: 2
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') == "force-14" %}
+                          green
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+              - show_name: true
+                show_icon: true
+                type: button
+                entity: input_select.wallbox_emhass_status
+                tap_action:
+                  action: perform-action
+                  perform_action: input_select.select_option
+                  target:
+                    entity_id: input_select.wallbox_emhass_status
+                  data:
+                    option: force-16
+                icon: mdi:battery-charging-90
+                name: 16 A
+                show_state: false
+                icon_height: 50px
+                grid_options:
+                  columns: 3
+                  rows: 2
+                card_mod:
+                  style: |
+                    :host {
+                      --card-mod-icon-color:
+                        {% if states('input_select.wallbox_emhass_status') == "force-16" %}
+                          green
+                        {% else %}
+                          var(--primary-text-color)
+                        {% endif %};
+                      }
+            grid_options:
+              columns: 12
+              rows: 1
+            visibility:
+              - condition: state
+                entity: binary_sensor.goe_297534_car_0
+                state: 'on'
+        column_span: 2
+      - type: grid
+        cards:
+          - camera_view: live
+            fit_mode: fill
+            type: picture-glance
+            title: Eingang
+            entities: []
+            camera_image: camera.entryway
+            tap_action:
+              action: none
+          - camera_view: live
+            fit_mode: fill
+            type: picture-glance
+            title: Terrasse
+            entities: []
+            camera_image: camera.backyard
+            tap_action:
+              action: none
+        column_span: 2
+      - type: grid
+        cards:
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: sensor.scb_battery_soc
+                name: Batterie
+                unit: '%'
+                min: 5
+                max: 100
+                needle: false
+                severity:
+                  green: 60
+                  yellow: 50
+                  red: 0
+                tap_action:
+                  action: none
+              - type: gauge
+                entity: sensor.scb_home_power_from_grid
+                unit: W
+                max: 30000
+                severity:
+                  green: 0
+                  yellow: 1500
+                  red: 3000
+                tap_action:
+                  action: none
+                min: 0
+                name: Bezug
+              - type: gauge
+                entity: sensor.scb_sum_power_of_all_pv_dc_inputs
+                min: 0
+                max: 12000
+                severity:
+                  green: 6000
+                  yellow: 4000
+                  red: 0
+                tap_action:
+                  action: none
+                name: PV Strom
+            grid_options:
+              columns: full
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: sensor.scb_home_power
+                name: Verbrauch
+                min: 0
+                max: 20000
+                severity:
+                  green: 0
+                  yellow: 4000
+                  red: 6000
+                tap_action:
+                  action: none
+              - type: gauge
+                entity: sensor.tibber27a_strompreis
+                name: Preis
+                severity:
+                  green: -0.5
+                  yellow: 0.285
+                  red: 0.4
+                min: -0.5
+                max: 1
+                tap_action:
+                  action: none
+              - type: gauge
+                min: 0
+                severity:
+                  green: 90
+                  yellow: 50
+                  red: 0
+                tap_action:
+                  action: none
+                entity: sensor.scb_autarky_day
+                name: Autark
+                unit: '%'
+                max: 100
+            grid_options:
+              columns: full
+          - type: custom:apexcharts-card
+            grid_options:
+              columns: full
+              rows: 5
+            header:
+              show: true
+              title: Energie-Monitor (±12h)
+              show_states: true
+              colorize_states: true
+            graph_span: 24h
+            span:
+              start: hour
+              offset: '-12h'
+            now:
+              show: true
+              label: Jetzt
+              color: red
+            apex_config:
+              chart:
+                height: 265px
+              forceNiceScale: true
+            yaxis:
+              - id: power
+                min: 0
+                decimals: 0
+                apex_config:
+                  title:
+                    text: Leistung (W)
+              - id: price
+                opposite: true
+                decimals: 3
+                apex_config:
+                  title:
+                    text: Preis (€)
+            series:
+              - entity: sensor.tibber_rohdaten_cache
+                name: Strompreis
+                yaxis_id: price
+                type: line
+                stroke_width: 1.5
+                color: '#e74c3c'
+                float_precision: 3
+                show:
+                  legend_value: false
+                  in_header: false
+                data_generator: |
+                  let prices = entity.attributes.price_data;
+                  return prices.map(item => {
+                    return [new Date(item.start_time).getTime(), item.price];
+                  });
+              - entity: sensor.scb_sum_power_of_all_pv_dc_inputs
+                name: PV Erzeugung
+                yaxis_id: power
+                type: area
+                color: '#ffc107'
+                opacity: 0.4
+                stroke_width: 1
+                extend_to: now
+                group_by:
+                  func: avg
+                  duration: 30min
+                show:
+                  legend_value: false
+                  in_header: false
+              - entity: sensor.scb_home_power
+                name: Verbrauch
+                yaxis_id: power
+                type: line
+                color: '#3498db'
+                stroke_width: 2
+                extend_to: now
+                group_by:
+                  func: avg
+                  duration: 30min
+                show:
+                  legend_value: false
+                  in_header: false
+              - entity: sensor.solcast_pv_forecast_prognose_heute
+                name: PV Forecast
+                yaxis_id: power
+                type: line
+                stroke_width: 2
+                color: '#ffffff'
+                stroke_dash:
+                  - 4
+                show:
+                  legend_value: false
+                  in_header: false
+                data_generator: >
+                  var today = entity.attributes.detailedForecast || [];
+
+                  var tomorrowState =
+                  hass.states['sensor.solcast_pv_forecast_prognose_morgen'];
+
+                  var tomorrow = tomorrowState ?
+                  tomorrowState.attributes.detailedForecast : [];
+
+                  var allData = today.concat(tomorrow);
+
+                  return allData.map(item => {
+                    return [new Date(item.period_start).getTime(), item.pv_estimate * 1000];
+                  });
+          - show_current: true
+            show_forecast: true
+            type: weather-forecast
+            entity: weather.forecast_home_2
+            forecast_type: hourly
+            grid_options:
+              columns: full
+              rows: 3
+            forecast_slots: 8
+        column_span: 2
+      - type: grid
+        cards:
+          - type: tile
+            entity: person.tanja
+            show_entity_picture: true
+            features_position: bottom
+            vertical: true
+            tap_action:
+              action: none
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 3
+              rows: 2
+          - type: tile
+            entity: person.daniel
+            show_entity_picture: true
+            features_position: bottom
+            vertical: true
+            tap_action:
+              action: none
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 3
+              rows: 2
+          - type: tile
+            entity: person.stefan
+            show_entity_picture: true
+            features_position: bottom
+            vertical: true
+            tap_action:
+              action: none
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 3
+              rows: 2
+          - type: tile
+            entity: person.simon
+            show_entity_picture: true
+            features_position: bottom
+            vertical: true
+            tap_action:
+              action: none
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 3
+              rows: 2
+          - type: tile
+            entity: person.lukas
+            show_entity_picture: true
+            features_position: bottom
+            vertical: true
+            tap_action:
+              action: none
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 3
+              rows: 2
+      - type: grid
+        cards:
+          - type: entities
+            entities:
+              - entity: sun.sun
+                secondary_info: none
+              - entity: sensor.sun_next_dawn
+                name: Morgendämmerung
+                secondary_info: none
+              - entity: sensor.sun_next_rising
+                name: Aufgang
+                secondary_info: none
+              - entity: sensor.sun_next_noon
+                name: Höchstand
+                secondary_info: none
+              - entity: sensor.sun_next_setting
+                secondary_info: none
+                name: Untergang
+              - entity: sensor.sun_next_dusk
+                secondary_info: none
+                name: Abenddämmerung
+            state_color: true
+        column_span: 1
+    cards: []
+    badges:
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: sensor.ccu3_webui_servicemeldungen
+        name: CCU Fehler
+        show_entity_picture: false
+        state_content: state
+        tap_action:
+          action: none
+        icon: mdi:unity
+        visibility:
+          - condition: numeric_state
+            entity: sensor.ccu3_webui_servicemeldungen
+            below: 1
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: sensor.ccu3_webui_servicemeldungen
+        name: CCU Fehler
+        show_entity_picture: false
+        state_content: state
+        tap_action:
+          action: none
+        icon: mdi:unity
+        visibility:
+          - condition: numeric_state
+            entity: sensor.ccu3_webui_servicemeldungen
+            above: 0
+        color: red
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.washing_machine_emhass_status
+        name: Waschmaschine
+        tap_action:
+          action: none
+        visibility:
+          - condition: state
+            entity: input_select.washing_machine_emhass_status
+            state: done
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.washing_machine_emhass_status
+        name: Waschmaschine
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.washing_machine_emhass_status
+          data:
+            option: force
+        visibility:
+          - condition: state
+            entity: input_select.washing_machine_emhass_status
+            state: wait
+        color: yellow
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.washing_machine_emhass_status
+        name: Waschmaschine
+        tap_action:
+          action: none
+        color: green
+        show_entity_picture: false
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: input_select.washing_machine_emhass_status
+                state: force
+              - condition: state
+                entity: input_select.washing_machine_emhass_status
+                state: running
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.dishwasher_emhass_status
+        name: Geschirrspüler
+        icon: mdi:dishwasher
+        tap_action:
+          action: none
+        visibility:
+          - condition: state
+            entity: input_select.dishwasher_emhass_status
+            state: done
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.dishwasher_emhass_status
+        name: Geschirrspüler
+        icon: mdi:dishwasher
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.dishwasher_emhass_status
+          data:
+            option: force
+        visibility:
+          - condition: state
+            entity: input_select.dishwasher_emhass_status
+            state: wait
+        color: yellow
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.dishwasher_emhass_status
+        name: Geschirrspüler
+        icon: mdi:dishwasher
+        tap_action:
+          action: none
+        color: green
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: input_select.dishwasher_emhass_status
+                state: force
+              - condition: state
+                entity: input_select.dishwasher_emhass_status
+                state: running
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.tumble_dryer_emhass_status
+        name: Wäschetrockner
+        tap_action:
+          action: none
+        visibility:
+          - condition: state
+            entity: input_select.tumble_dryer_emhass_status
+            state: done
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.tumble_dryer_emhass_status
+        name: Wäschetrockner
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.tumble_dryer_emhass_status
+          data:
+            option: force
+        color: yellow
+        visibility:
+          - condition: state
+            entity: input_select.tumble_dryer_emhass_status
+            state: wait
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.tumble_dryer_emhass_status
+        name: Wäschetrockner
+        tap_action:
+          action: none
+        color: green
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: input_select.tumble_dryer_emhass_status
+                state: force
+              - condition: state
+                entity: input_select.tumble_dryer_emhass_status
+                state: running
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.water_bioler_emhass_status
+        name: Heisswasser
+        tap_action:
+          action: none
+        visibility:
+          - condition: state
+            entity: input_select.water_bioler_emhass_status
+            state: done
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.water_bioler_emhass_status
+        name: Heisswasser
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.water_bioler_emhass_status
+          data:
+            option: force
+        visibility:
+          - condition: state
+            entity: input_select.water_bioler_emhass_status
+            state: wait
+        color: yellow
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.water_bioler_emhass_status
+        name: Heisswasser
+        tap_action:
+          action: none
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: input_select.water_bioler_emhass_status
+                state: force
+              - condition: state
+                entity: input_select.water_bioler_emhass_status
+                state: running
+        color: green
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.pv_battery_emhass_status
+        tap_action:
+          action: none
+        visibility:
+          - condition: state
+            entity: input_select.pv_battery_emhass_status
+            state: done
+        name: PV Battery
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.pv_battery_emhass_status
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.pv_battery_emhass_status
+          data:
+            option: force
+        visibility:
+          - condition: state
+            entity: input_select.pv_battery_emhass_status
+            state: wait
+        name: PV Battery
+        color: yellow
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: input_select.pv_battery_emhass_status
+        tap_action:
+          action: none
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: input_select.pv_battery_emhass_status
+                state: force
+              - condition: state
+                entity: input_select.pv_battery_emhass_status
+                state: running
+        name: PV Battery
+        color: green
+    header:
+      layout: center
+      badges_position: top
+      badges_wrap: wrap

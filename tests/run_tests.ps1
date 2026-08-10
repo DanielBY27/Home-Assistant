@@ -12,7 +12,7 @@ if (Test-Path "debug.log") {
 
 Write-Host "Running tests..."
 # Run the docker container, mapping our current project directory to /app inside the container
-docker run --rm -v "${PWD}:/app" -w /app home-assistant-tests pytest -sv --tb=line $args
+docker run --rm -v "${PWD}:/app" -e PYTHONPATH=/app -w /app home-assistant-tests pytest -sv --tb=line $args
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Tests failed!"
