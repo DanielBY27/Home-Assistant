@@ -33,7 +33,7 @@ try {
     }
 
     Write-Host "3. Leere /config/solcast_data_logger.csv auf Home Assistant..." -ForegroundColor Cyan
-    ssh -o BatchMode=yes homeassistant "echo '' > /config/solcast_data_logger.csv"
+    ssh -o BatchMode=yes homeassistant "sudo truncate -s 0 /config/solcast_data_logger.csv"
     Write-Host "Datei auf Home Assistant erfolgreich geleert." -ForegroundColor Green
 
     Write-Host "`n4. Lese aktuelle Dämpfungsfaktoren aus 'Pivot-Tabelle 1'..." -ForegroundColor Cyan
