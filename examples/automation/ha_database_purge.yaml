@@ -44,6 +44,8 @@ actions:
         - device_tracker
         - person
         - event
+        - camera
+        - image
       entity_id:
         - sensor.geschirrspulerstatistik10
         - sensor.waschmaschinestatistik10
@@ -72,7 +74,6 @@ actions:
         - sensor.tabletmonitor_*
         - sensor.tz3000_2putqrmw_ts011f_*
         - sensor.waschmaschine_*
-        - sensor.waschmaschine_*
         - sensor.workstation_*
         - sensor.printer_*
         - sensor.kaffeemaschine_*
@@ -80,6 +81,11 @@ actions:
         - sensor.lukas_tv_*
         - sensor.lukas_workstation_*
         - sensor.simon_tv_*
+        - sensor.tablet_flur_eg_*
+        - sensor.heisswasser_pv_*
+        - sensor.staubsaugerroboter_*
+        - sensor.ccu3_*
+        - sensor.motion_detector_*
   - action: recorder.purge_entities
     metadata: {}
     data:
