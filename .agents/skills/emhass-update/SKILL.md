@@ -1,367 +1,151 @@
 ---
 name: emhass-update
-description: Safe, fully automated, and verified update procedure for the EMHASS add-on in Home Assistant, including local tests, blueprint compatibility checks, snapshot backups, error suppression, and trace analysis.
+description: Safe, token-efficient, and verified update procedure for the EMHASS add-on in Home Assistant with automated backup, blueprint validation, and trace analysis.
 ---
 
-# EMHASS Add-on Update Workflow
+# EMHASS Add-on Update
 
-This skill provides a safe, reproducible, and verified update process for the Home Assistant EMHASS add-on (`5b918bf2_emhass` / `update.emhass_update`). It prevents service outages, API breaking changes, false-positive error notification storms, and configuration incompatibilities.
+Update procedure for the Home Assistant EMHASS add-on (`5b918bf2_emhass` / `update.emhass_update`). Ensures local blueprint synchronization, automated snapshot backups, notification suppression during upgrade, and trace validation.
 
----
-
-## 1. Architecture & Context
-
-Before updating, review the component architecture (see [README.md](../../../README.md)):
-- **EMHASS Add-on:** Runs as a container under Home Assistant Supervisor (`slug: 5b918bf2_emhass`, REST API default port `5000`).
-- **Central Controller (`emhass_basic.yaml`):** Manages optimizations (`naive-mpc-optim`, `dayahead-optim`), sensor publishing (`publish-data`), and configuration persistence (`set-config`).
-- **Satellite Load Triggers (`emhass_basic_trigger.yaml`, `emhass_basic_trigger_go_echarger.yaml`):** Calculate dynamic parameters for deferrable loads and feed them to the central controller.
-- **Local Test Suite (`tests/run_tests.ps1`):** Simulates Home Assistant and EMHASS inside a Docker container to catch template and logic regressions prior to deployment.
+## Architecture Context
+- **EMHASS Add-on:** Docker container under Supervisor (`slug: 5b918bf2_emhass`, REST port 5000).
+- **Controller Blueprint:** `blueprints/automation/emhass_basic.yaml` (`automation.emhass_basic_automation`).
+- **Sync Rule:** Live HA blueprints must stay strictly identical to local Git repository blueprints. Always sync via `ha_manage_blueprints` (SSH `admin` user lacks write permissions on `/config/blueprints/`).
+- **Docs & Structure:** See [README.md](../../../README.md).
 
 ---
 
-## 2. The 13-Step Update Workflow
+## 13-Step Update Procedure
 
-```mermaid
-flowchart TD
-    S1[1. Check EMHASS Update Availability] --> S2{Update Available?}
-    S2 -- No --> S2_End[2. Exit cleanly]
-    S2 -- Yes --> S3[3. Review Architecture & README]
-    S3 --> S4[4. Run Local Docker Tests]
-    S4 --> S5[5. Get Installed Version]
-    S5 --> S6[6. Get Target Version]
-    S6 --> S7[7. Diff Release Notes & Code Changes]
-    S7 --> S8[8. Pre-Update HA Test Run]
-    S8 --> S9[9. Temporarily Disable Failure Notifications]
-    S9 --> S10[10. Perform EMHASS Update with Backup]
-    S10 --> S11[11. Post-Update Test Run & Trace Verification]
-    S11 --> S12{Errors Detected?}
-    S12 -- Yes --> S12_Fix[12. Debug via SSH/Logs/Rollback]
-    S12_Fix --> S11
-    S12 -- No --> S13[13. Re-enable Failure Notifications]
-```
-
----
-
-### Step 1 & 2: Check Update Availability
-Check via the Home Assistant MCP server whether an update is available for the EMHASS add-on:
-
+### 1 & 2. Check Update Availability & Early Exit
 ```json
 // Tool: ha_manage_updates
-{
-  "action": "list"
-}
+{ "action": "get", "entity_ids": ["update.emhass_update"] }
 ```
-Or directly for the specific entity:
-```json
-// Tool: ha_manage_updates
-{
-  "action": "get",
-  "entity_ids": ["update.emhass_update"]
-}
+- If `installed_version == latest_version` or entity state is `"off"`, exit cleanly: *"No update available."*
+
+### 3. Architecture & Dependency Review
+Check [README.md](../../../README.md) for configured loads, sensor bindings, and active trigger blueprints (`emhass_basic_trigger.yaml`, `emhass_basic_trigger_go_echarger.yaml`).
+
+### 4. Docker Service & Local Tests
+Before touching HA, verify the Docker engine and run local unit tests:
+```powershell
+docker info --format '{{.ServerVersion}}'
+powershell -File tests/run_tests.ps1
 ```
-- **Exit Condition:** If `installed_version == latest_version` or `update_available == false`, terminate the workflow with an informative message ("No update required").
+All tests in `tests/test_emhass_basic.py` and `tests/test_multi_load.py` must pass.
 
----
-
-### Step 3: Review Architecture & Project Structure
-Review [README.md](../../../README.md) and confirm:
-- Which deferrable loads are configured (`trigger_objs`).
-- Which blueprint files (`blueprints/automation/emhass_basic.yaml`, `emhass_basic_trigger.yaml`, `emhass_basic_trigger_go_echarger.yaml`) are active.
-- Target blueprint paths on the live system (`/config/blueprints/automation/`).
-
----
-
-### Step 4: Verify Docker Daemon & Execute Local Tests
-Before touching the live environment, verify that all local unit and regression tests pass:
-
-1. **Check Docker Daemon:**
-   ```powershell
-   docker info --format '{{.ServerVersion}}'
-   ```
-   *(Note: On Windows with Docker Desktop WSL2 backend, `Get-Service com.docker.service` may report `Stopped`. Always rely on `docker info`.)*
-
-2. **Run Test Suite:**
-   ```powershell
-   powershell -File tests/run_tests.ps1
-   ```
-   All test cases in [tests/test_emhass_basic.py](../../../tests/test_emhass_basic.py) and [tests/test_multi_load.py](../../../tests/test_multi_load.py) must pass (`PASSED`).
-
----
-
-### Step 5 & 6: Inspect Installed & Target Versions
-Inspect and record version information:
+### 5 & 6. Verify Versions
+Record installed vs target version from `update.emhass_update` or:
 ```json
 // Tool: ha_get_app
-{
-  "source": "installed"
-}
-```
-Find the app slug `5b918bf2_emhass`:
-- **Installed Version:** e.g. `v0.17.6`
-- **Target Version:** e.g. `v0.18.5`
-
----
-
-### Step 7: Analyze Release Notes & Code Breaking Changes
-Fetch release notes directly from Home Assistant:
-```json
-// Tool: ha_manage_updates
-{
-  "action": "get",
-  "entity_ids": ["update.emhass_update"],
-  "include_release_notes": true
-}
+{ "slug": "5b918bf2_emhass", "source": "installed" }
 ```
 
-> [!WARNING]
-> **Critical EMHASS Breaking Change Patterns:**
-> 1. **REST API HTTP Status Codes:**
->    - In older releases (e.g. `v0.17.6`), action endpoints (`naive-mpc-optim`, `dayahead-optim`, `publish-data`) returned HTTP `201 Created`.
->    - Starting in `v0.17.7+`, successful actions return HTTP `200 OK`.
->    - Verify that [blueprints/automation/emhass_basic.yaml](../../../blueprints/automation/emhass_basic.yaml) checks `response.status not in [200, 201]` instead of `response.status != 201` to prevent false failure alerts!
-> 2. **New Parameters in `config_defaults.json`:**
->    - The blueprint `Save` action (`result_data.save`) calls `/set-config`. If parameters introduced in newer EMHASS versions are omitted or array lengths mismatch, configuration saves or optimizations fail.
->    - Compare upstream GitHub tags (`davidusb-geek/emhass`):
->      - `src/emhass/data/config_defaults.json`
->      - `src/emhass/utils.py` (specifically `DEF_LOAD_ARRAY_PARAMS`)
->    - All new deferrable load parameters must be padded with `([default] * (trigger_objs | length))`.
-> 3. **Blueprint Synchronization:**
->    - When local blueprint files are modified, always ensure the local Git repository and Home Assistant are kept identical.
->    - **Preferred Method (via ha_mcp):**
->      Use `ha_manage_blueprints` to save the updated blueprint directly to Home Assistant. This automatically creates an edit snapshot backup and reloads all automations using the blueprint:
->      ```json
->      // Tool: ha_manage_blueprints
->      {
->        "action": "save",
->        "domain": "automation",
->        "path": "emhass_basic.yaml",
->        "overwrite": true,
->        "yaml": "<full content of local blueprints/automation/emhass_basic.yaml>"
->      }
->      ```
->    - **SSH Context:**
->      Connecting via SSH uses the host alias `ssh homeassistant` (from local `~/.ssh/config`). Note that SSH sessions run under standard user permissions without root privileges, so writing directly to `/config/blueprints/` via SSH is blocked by file ownership. Thus, `ha_manage_blueprints` via the MCP server is the canonical synchronization method.
+### 7. Release Notes & Breaking Changes Analysis
+Inspect release notes via `ha_manage_updates(action="get", entity_ids=["update.emhass_update"], include_release_notes=True)` or GitHub tags (`davidusb-geek/emhass`).
+- **HTTP Status Codes:** EMHASS ≥v0.18 returns `200` instead of `201`. Ensure `blueprints/automation/emhass_basic.yaml` checks `response.status not in [200, 201]`.
+- **Parameter Additions:** Verify `DEF_LOAD_ARRAY_PARAMS` in `emhass/utils.py` and `config_defaults.json`. Pad new deferrable load arrays with `([default] * (trigger_objs | length))` in `result_data.save`.
+- **Blueprint Sync:** When editing blueprints locally, update HA immediately:
+  ```json
+  // Tool: ha_manage_blueprints
+  {
+    "action": "save",
+    "domain": "automation",
+    "path": "emhass_basic.yaml",
+    "overwrite": true,
+    "yaml": "<local file content>"
+  }
+  ```
 
----
-
-### Step 8: Pre-Update Test Run in Home Assistant
-Execute a manual verification run against the currently installed version before upgrading.
-
-1. **Verify Automation Configuration:**
+### 8. Pre-Update HA Test Run
+1. Fetch config to ensure `automation_started_manually == "all"`:
    ```json
    // Tool: ha_config_get_automation
-   {
-     "identifier": "automation.emhass_basic_automation"
-   }
+   { "identifier": "automation.emhass_basic_automation" }
    ```
-   Ensure `automation_started_manually` is set to `"all"` (so that manual triggers execute the full sequence: Save, Optim, Publish). If set to `"log"`, temporarily update it to `"all"` via `ha_config_set_automation`.
-
-2. **Trigger Automation Manually:**
+2. Trigger the automation:
    ```json
    // Tool: ha_call_service
-   {
-     "domain": "automation",
-     "service": "trigger",
-     "target": {
-       "entity_id": "automation.emhass_basic_automation"
-     }
-   }
+   { "domain": "automation", "service": "trigger", "entity_id": "automation.emhass_basic_automation" }
    ```
+3. Verify trace via `ha_get_automation_traces(automation_id="automation.emhass_basic_automation", limit=1)`. All actions (`Save`, `Forecast`, `Optimization`, `Publish`) must succeed (`execution: finished`).
 
-3. **Verify Execution:**
-   - Check automation trace:
-     ```json
-     // Tool: ha_get_automation_traces
-     {
-       "automation_id": "automation.emhass_basic_automation",
-       "limit": 1
-     }
-     ```
-     Verify: `state == "stopped"`, `script_execution == "finished"`, no `error`.
-   - Check add-on logs:
-     ```json
-     // Tool: ha_get_logs
-     {
-       "source": "supervisor",
-       "slug": "5b918bf2_emhass"
-     }
-     ```
-
----
-
-### Step 9: Temporarily Disable Failure Notifications
-To prevent notification noise (e.g. mobile push, Telegram) while the add-on container restarts or encounters transient errors during the update:
-
-1. Retrieve current automation config:
-   ```json
-   // Tool: ha_config_get_automation
-   {
-     "identifier": "automation.emhass_basic_automation"
-   }
-   ```
-2. Set `enable_optim_failure_notification: false`:
+### 9. Temporarily Disable Failure Notifications
+Suppress failure notifications before the update:
+1. Obtain current `config_hash` via `ha_config_get_automation(identifier="automation.emhass_basic_automation")`.
+2. Disable failure notification:
    ```json
    // Tool: ha_config_set_automation
    {
      "identifier": "automation.emhass_basic_automation",
-     "config_hash": "<current_hash>",
-     "action": "update",
-     "automation_config": {
-       "use_blueprint": {
-         "input": {
-           "enable_optim_failure_notification": false
-         }
-       }
-     }
+     "config_hash": "<config_hash>",
+     "python_transform": "config['use_blueprint']['input']['enable_optim_failure_notification'] = False",
+     "BestPracticeKey": "<key-from-ha_get_skill_guide>",
+     "MandatoryBPS": false
    }
    ```
+   *(If BestPracticeKey is needed, read `ha_get_skill_guide(file='references/triggers-and-conditions.md')` to obtain the hourly acknowledgment key).*
 
----
-
-### Step 10: Perform EMHASS Update with Backup
-Trigger the update via Supervisor and **explicitly mandate a backup**:
-
-```json
-// Tool: ha_manage_updates
-{
-  "action": "install",
-  "entity_ids": ["update.emhass_update"],
-  "backup": true
-}
-```
-
-> [!IMPORTANT]
-> **Verify Backup Creation:**
-> Check that a backup containing the prior version was created using `ha_manage_backup(action="list")`.
-
-Wait until the EMHASS container completes its startup:
-```json
-// Tool: ha_get_app
-{
-  "source": "installed"
-}
-```
-Verify that `5b918bf2_emhass` reports state `started` and the new version string.
-
----
-
-### Step 11: Post-Update Test Run & Trace Verification
-Execute a comprehensive test run following the update:
-
-1. **Trigger Automation Manually:**
+### 10. Perform EMHASS Update with Backup
+1. Install update with mandatory backup:
    ```json
-   // Tool: ha_call_service
-   {
-     "domain": "automation",
-     "service": "trigger",
-     "target": {
-       "entity_id": "automation.emhass_basic_automation"
-     }
-   }
+   // Tool: ha_manage_updates
+   { "action": "install", "entity_ids": ["update.emhass_update"], "backup": true }
    ```
-2. **Inspect Automation Traces in Detail:**
-   ```json
-   // Tool: ha_get_automation_traces
-   {
-     "automation_id": "automation.emhass_basic_automation",
-     "limit": 1
-   }
-   ```
-   Retrieve detailed step results with the latest `run_id`:
-   ```json
-   // Tool: ha_get_automation_traces
-   {
-     "automation_id": "automation.emhass_basic_automation",
-     "run_id": "<run_id>",
-     "sections": "actions,error"
-   }
-   ```
-   Verify inside `action_trace`:
-   - All `rest_command` calls (`Save`, `Optimization`, `Publish`) completed with status `200` (or `201`).
-   - The failure condition `action/2/repeat/sequence/1/if` evaluated to `result: false`.
-
-3. **Check Supervisor Add-on Logs:**
-   ```json
-   // Tool: ha_get_logs
-   {
-     "source": "supervisor",
-     "slug": "5b918bf2_emhass"
-   }
-   ```
-   Confirm absence of Python tracebacks (`KeyError`, `ValueError`, `500 Internal Server Error`).
-
----
-
-### Step 12: Debugging & Remediation (If Errors Occur)
-If issues are detected during Step 11:
-
-1. **SSH Diagnostics:**
-   Query container logs directly on Home Assistant:
-   ```powershell
-   ssh homeassistant "docker logs addon_5b918bf2_emhass --tail 100"
-   ```
-2. **Inspect Saved Config:**
-   ```powershell
-   ssh homeassistant "cat /share/config.json"
-   ```
-3. **Deploy Blueprint Fixes:**
-   If new payload fields or status code adjustments are needed:
-   - Fix locally in `blueprints/automation/emhass_basic.yaml`.
-   - Run local tests: `powershell -File tests/run_tests.ps1`.
-   - Deploy to Home Assistant:
-     ```powershell
-     Get-Content -Raw -Encoding UTF8 blueprints/automation/emhass_basic.yaml | ssh homeassistant "cat > /config/blueprints/automation/emhass_basic.yaml"
-     ```
-   - Reload automations: `ha_call_service(domain="automation", service="reload")`.
-4. **Emergency Rollback (if necessary):**
-   If an unfixable upstream bug is encountered, restore the prior backup:
+   *(Note: Service call may time out on client side while HA packages the backup archive. This is expected).*
+2. Verify backup existence:
    ```json
    // Tool: ha_manage_backup
-   {
-     "action": "restore",
-     "slug": "<backup_slug>"
-   }
+   { "scope": "snapshot", "action": "list" }
    ```
-
----
-
-### Step 13: Re-enable Notifications & Restore Initial State
-Once the post-update test run passes cleanly, restore the production configuration:
-
-1. Fetch latest config hash via `ha_config_get_automation`.
-2. Re-enable failure notifications:
+   Confirm a snapshot named `EMHASS <old_version>` exists.
+3. Poll update status until `in_progress == false` and state is `"off"`:
    ```json
-   // Tool: ha_config_set_automation
-   {
-     "identifier": "automation.emhass_basic_automation",
-     "config_hash": "<current_hash>",
-     "action": "update",
-     "automation_config": {
-       "use_blueprint": {
-         "input": {
-           "enable_optim_failure_notification": true
-         }
-       }
-     }
-   }
+   // Tool: ha_get_state
+   { "entity_id": "update.emhass_update" }
    ```
-3. If `automation_started_manually` was altered before Step 8, restore its original value (e.g. `"log"` or `"all"`).
-
----
-
-## 3. Test Extensions & Best Practices
-
-1. **Payload Key Validation Tests:**
-   In [tests/test_emhass_basic.py](../../../tests/test_emhass_basic.py), maintain a test case that validates all keys in `result_data.save` against the current `config_defaults.json`.
-2. **HTTP Status Code Tolerance:**
-   Treat both HTTP 200 and 201 as valid success states:
-   ```yaml
-   value_template: "{{ (context | from_json).automation.notify_enabled | bool and response.status not in [200, 201] }}"
+4. Verify add-on running status:
+   ```json
+   // Tool: ha_get_app
+   { "slug": "5b918bf2_emhass", "source": "installed" }
    ```
-3. **Automated Git Commit:**
-   Following a successful update and any blueprint adjustments, commit and tag the changes:
-   ```powershell
-   git status
-   git add blueprints/ .agents/skills/
-   git commit -m "chore(emhass): update to <target_version> and adjust blueprint compatibility"
+   Confirm `state: "started"` and `version` matches target.
+
+### 11. Post-Update Test Run & Trace Verification
+1. Trigger automation:
+   ```json
+   // Tool: ha_call_service
+   { "domain": "automation", "service": "trigger", "entity_id": "automation.emhass_basic_automation" }
    ```
+2. Verify latest run in `ha_get_automation_traces(automation_id="automation.emhass_basic_automation", limit=1)`. Retrieve detailed trace by `run_id` to confirm all REST commands returned `200` (or `201`) and `script_execution == "finished"`.
+3. Check add-on logs:
+   ```json
+   // Tool: ha_get_logs
+   { "source": "supervisor", "slug": "5b918bf2_emhass" }
+   ```
+   Verify solver status is `Optimal` and entities posted successfully.
+
+### 12. Error Diagnostics & Remediation (If Needed)
+- View container logs directly: `ssh homeassistant "docker logs addon_5b918bf2_emhass --tail 100"`
+- Check stored JSON: `ssh homeassistant "cat /share/config.json"`
+- Rollback if critical failure cannot be solved:
+  ```json
+  // Tool: ha_manage_backup
+  { "scope": "snapshot", "action": "restore", "backup_id": "<backup_id>" }
+  ```
+
+### 13. Re-enable Failure Notifications
+Restore the production notification setting:
+```json
+// Tool: ha_config_set_automation
+{
+  "identifier": "automation.emhass_basic_automation",
+  "config_hash": "<config_hash>",
+  "python_transform": "config['use_blueprint']['input']['enable_optim_failure_notification'] = True",
+  "BestPracticeKey": "<key>",
+  "MandatoryBPS": false
+}
+```
+If `automation_started_manually` was modified in Step 8, restore its initial value.
+Ensure local Git workspace is clean and committed.
