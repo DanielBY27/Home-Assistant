@@ -1,6 +1,6 @@
 import pytest
 import json
-from ha_mock import load_example_inputs, load_blueprint_and_render_variables
+from ha_mock import load_example_inputs, load_blueprint_and_render_variables, HomeAssistantMockEnv
 
 def setup_basic_mock(overrides=None, trigger=None):
     """
@@ -81,3 +81,34 @@ def test_emhass_basic_scenarios(scenario, overrides, trigger, check_type):
         # Index 1 is Tumble Dryer (status: 'wait') - should NOT be 0
         idx_wait = 1
         assert optim_payload["nominal_power_of_deferrable_loads"][idx_wait] > 0
+
+
+@pytest.mark.parametrize("status_code, notify_enabled, expected_notification", [
+    (200, True, False),   # EMHASS v0.17.7+ success returns 200 -> no failure notification
+    (201, True, False),   # Legacy EMHASS v0.17.6 success returns 201 -> no failure notification
+    (400, True, True),    # Bad request / failure -> notification triggered
+    (500, True, True),    # Internal server error -> notification triggered
+    (200, False, False),  # Notifications disabled -> no notification
+    (400, False, False),  # Notifications disabled -> no notification
+])
+def test_emhass_basic_notification_status_codes(status_code, notify_enabled, expected_notification):
+    """
+    Verifies that the blueprint notification condition does not trigger on HTTP 200 or 201,
+    but does trigger on HTTP errors (400, 500) when notify_enabled is True.
+    """
+    mock_data = setup_basic_mock()
+    env = HomeAssistantMockEnv(mock_data)
+    
+    context_str = json.dumps({
+        "automation": {
+            "notify_enabled": notify_enabled,
+            "notify_group": "persistent_notification"
+        }
+    })
+    
+    template_str = "{{ (context | from_json).automation.notify_enabled | bool and response.status not in [200, 201] }}"
+    template = env.env.from_string(template_str)
+    result = template.render(context=context_str, response={"status": status_code})
+    
+    assert (result.strip().lower() == "true") == expected_notification
+

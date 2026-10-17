@@ -1633,7 +1633,7 @@ actions:
           response_variable: response
         - if:
             - condition: template
-              value_template: "{{ (context | from_json).automation.notify_enabled | bool and response.status != 201 }}"
+              value_template: "{{ (context | from_json).automation.notify_enabled | bool and response.status not in [200, 201] }}"
           then:
             - action: notify.{{ (context | from_json).automation.notify_group }}
               data:
