@@ -45,14 +45,12 @@ actions:
       min_pv_power_threshold: 1500
       # Remaining PV forecast for today (kWh) above which surplus support is permitted:
       min_remaining_pv_kwh: 3.0
-      # Lower bound (SoC %) down to which the battery may discharge into the car when PV forecast is sufficient:
-      wallbox_allowed_min_soc: 10
-
       # Wallbox logic mode: 4 = Eco / PV Surplus, 3 = Default / Scheduled
       is_surplus_mode: "{{ is_state('select.goe_297534_lmo', '4') }}"
 
-      # Current battery SoC
+      # Current battery SoC and inverter minimum SoC setting
       current_soc: "{{ states('sensor.scb_battery_soc') | int(10) }}"
+      current_min_setting: "{{ states('number.scb_battery_min_soc') | int(10) }}"
 
       # Real PV generation (DC1 + DC2 strings):
       # Note: On Kostal Plenticore with battery on DC3, sensor.scb_solar_power includes battery discharge power!
@@ -65,16 +63,31 @@ actions:
       load_forecast_24h: "{{ (state_attr('sensor.p_load_forecast', 'forecasts') | default([], true) | map(attribute='p_load_forecast') | map('float', 0.0) | sum) * 0.25 }}"
 
       # EMHASS planned target battery SoC (sensor.soc_batt_forecast):
-      # Clamped between 10% and 90%, rounded up to 5% increments
       emhass_target_soc: "{{ states('sensor.soc_batt_forecast') | float(current_soc) }}"
-      emhass_calc_soc: "{{ [10, [((emhass_target_soc / 5) | round(0, 'ceil') * 5) | int(10), 90] | min] | max }}"
 
   # Compute derived condition in a separate variables step to ensure inputs are resolved
   - variables:
+      # Battery recovery hysteresis:
+      # When battery drops to <= 10%, it must recover above 20% before it may discharge to 10% again.
+      is_battery_recovering: >-
+        {{ current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20) }}
+      base_min_soc: >-
+        {{ 20 if (current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20)) else 10 }}
+
+      # Lower bound (SoC %) down to which the battery may discharge into the car when PV forecast is sufficient:
+      wallbox_allowed_min_soc: >-
+        {{ 20 if (current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20)) else 10 }}
+
       # In PV surplus mode: allow battery buffering only if real PV generation AND forecast are both sufficient
       has_enough_pv: >-
         {{ pv_power >= min_pv_power_threshold and
            solcast_remaining_today >= min_remaining_pv_kwh }}
+
+      # EMHASS planned target battery SoC:
+      # Clamped between base_min_soc and 90%, rounded up to 5% increments
+      emhass_calc_soc: >-
+        {% set b_min = 20 if (current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20)) else 10 %}
+        {{ [b_min, [((emhass_target_soc / 5) | round(0, 'ceil') * 5) | int(b_min), 90] | min] | max }}
 
   - choose:
       # Case 1: EMHASS grid charging active for home battery
@@ -123,7 +136,7 @@ actions:
                               value: "{{ wallbox_allowed_min_soc }}"
                     default:
                       - variables:
-                          protect_soc: "{{ [10, [current_soc, 90] | min] | max }}"
+                          protect_soc: "{{ [base_min_soc, [current_soc, 90] | min] | max }}"
                       - action: number.set_value
                         target:
                           entity_id: number.scb_battery_min_soc
@@ -144,13 +157,13 @@ actions:
                     data:
                       value: "{{ emhass_calc_soc }}"
 
-    # Default (neither grid charging nor Wallbox active): reset to base value (10%)
+    # Default (neither grid charging nor Wallbox active): reset to base value (10% or 20% if recovering)
     default:
       - action: number.set_value
         target:
           entity_id: number.scb_battery_min_soc
         data:
-          value: 10
+          value: "{{ base_min_soc }}"
 
   # Always ensure Kostal usage mode is set to None
   - action: select.select_option

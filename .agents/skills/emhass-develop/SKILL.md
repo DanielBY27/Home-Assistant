@@ -98,19 +98,44 @@ The go-eCharger controller (`examples/blueprints/emhass_basic_trigger_go_echarge
   {{ (states('sensor.scb_dc1_power') | float(0.0)) + (states('sensor.scb_dc2_power') | float(0.0)) }}
   ```
 
+### Physical Battery Constraints & True 1:1 SoC Mapping
+- **Hardware Minimum Floor (10%):** The Kostal BYD/home battery system has a physical hardware floor at 10% to prevent deep discharge degradation. It cannot discharge below 10%.
+- **EMHASS Parameter Configuration:**
+  - `emhass_config_battery_minimum_state_of_charge` must be set to `0.10` (10%). Never configure it to lower values (such as `0.05`), as that causes the LP solver to schedule unachievable discharges.
+  - `emhass_config_soc_init`: Must use the direct 1:1 physical battery SoC:
+    ```jinja2
+    {{ (states('sensor.scb_battery_soc') | float(10) / 100) | round(2) }}
+    ```
+    Artificial compression or linear shifting (e.g., `(soc - 20) / 80`) must NOT be used, as it misrepresents actual available energy to the LP solver (falsely indicating an empty battery at 20% or only 19% at 35%).
+
+### Battery Recovery Hysteresis (10% ↔ 20%)
+To protect the battery cells and avoid rapid cycling around the emergency reserve floor, the Kostal controller implements stateful hysteresis:
+1. **Floor Reached ($\le 10\%$):** When battery SoC drops to $\le 10\%$, recovery mode activates. `base_min_soc` immediately steps up from 10% to 20%.
+2. **Discharge Prevention During Recharge ($10\% < \text{SoC} \le 20\%$):** The inverter's `number.scb_battery_min_soc` remains at 20%. Any solar charging is retained; household load peaks or EV charging cannot discharge the battery back to 10%.
+3. **Recovery Exit ($> 20\%$):** Once battery SoC rises above 20% (e.g., 21%), recovery mode deactivates and `base_min_soc` returns to 10%.
+4. **State Machine Formulation (no extra helper needed):**
+   ```jinja2
+   current_soc: "{{ states('sensor.scb_battery_soc') | int(10) }}"
+   current_min_setting: "{{ states('number.scb_battery_min_soc') | int(10) }}"
+   is_battery_recovering: >-
+     {{ current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20) }}
+   base_min_soc: >-
+     {{ 20 if (current_soc <= 10 or (current_min_setting >= 20 and current_soc <= 20)) else 10 }}
+   ```
+
 ### Kostal Min SoC Controller (`examples/automation/kostal_min_soc_controller.yaml`)
 Dynamically controls `number.scb_battery_min_soc` and coordinates with EMHASS and Wallbox modes:
 - **Case 1: Battery Grid Charging (`input_select.pv_battery_emhass_status` in `running`, `force`)**:
-  - Sets `scb_battery_min_soc` to `emhass_calc_soc` (rounded up to 5% increments from `sensor.soc_batt_forecast`).
+  - Sets `scb_battery_min_soc` to `emhass_calc_soc` (clamped between `base_min_soc` and 90%, rounded up to 5% increments from `sensor.soc_batt_forecast`).
 - **Case 2: EV Charging at Wallbox (`input_select.wallbox_emhass_status` active)**:
   - **Subcase 2a: PV Surplus Mode (`select.goe_297534_lmo == '4'`)**:
-    - If real PV ($DC1+DC2 \ge 1500\text{ W}$) **and** Solcast remaining forecast $\ge 3.0\text{ kWh}$: Allows battery buffering down to 10% (`wallbox_allowed_min_soc`).
-    - Otherwise (cloudy/evening): Protects home battery by locking `scb_battery_min_soc` to `current_soc`.
+    - If real PV ($DC1+DC2 \ge 1500\text{ W}$) **and** Solcast remaining forecast $\ge 3.0\text{ kWh}$: Allows battery buffering down to `wallbox_allowed_min_soc` (`base_min_soc`, i.e., 20% if recovering, 10% otherwise).
+    - Otherwise (cloudy/evening): Protects home battery by locking `scb_battery_min_soc` to `protect_soc` (`[base_min_soc, current_soc] | max`).
   - **Subcase 2b: EMHASS Scheduled Charging / Grid Mode (`select.goe_297534_lmo != '4'`)**:
     - Aligns directly with EMHASS's global cost-optimal schedule.
     - Sets `scb_battery_min_soc` to `emhass_calc_soc` (`sensor.soc_batt_forecast`). Kostal will cover any minor planned battery assistance, but will never drain the battery below the forecast level, reserving home battery capacity for expensive peak hours.
 - **Default (Idle)**:
-  - When neither grid charging nor Wallbox is active, resets `scb_battery_min_soc` to 10% and ensures `select.battery_charging_usage_mode` is `None`.
+  - When neither grid charging nor Wallbox is active, resets `scb_battery_min_soc` to `base_min_soc` (10%, or 20% if recovering) and ensures `select.battery_charging_usage_mode` is `None`.
 
 ### EMHASS PV Battery Status Controller (`examples/automation/emhass_pv_battery_status_controller.yaml`)
 - Interprets EMHASS `sensor.p_batt_forecast` to manage home battery charging and discharging.

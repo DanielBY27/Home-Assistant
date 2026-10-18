@@ -282,8 +282,8 @@ blueprint:
         emhass_host:
           name: Host
           description: >
-            Hostname or IP address of the EMHASS Server (e.g., 'localhost' or the add-on IP).
-          default: localhost
+            Hostname or IP address of the EMHASS Server (e.g., '127.0.0.1' or the add-on IP).
+          default: 127.0.0.1
           selector:
             text:
               type: text
@@ -1526,7 +1526,7 @@ actions:
             'influxdb_retention_policy': emhass_config_influxdb_retention_policy,
             'influxdb_use_ssl': emhass_config_influxdb_use_ssl,
             'influxdb_verify_ssl': emhass_config_influxdb_verify_ssl,
-            'is_electric_load': emhass_config_is_electric_load,
+            'is_electric_load': ([true] * (trigger_objs | length)),
             'lp_solver_mip_rel_gap': emhass_config_lp_solver_mip_rel_gap,
             'sensor_power_photovoltaics_forecast': emhass_config_sensor_power_photovoltaics_forecast,
             'ssl_no_verify': emhass_config_ssl_no_verify,

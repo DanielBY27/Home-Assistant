@@ -49,12 +49,8 @@ use_blueprint:
       {% else %}
         {{ ([0] * 96) }}
       {% endif %}
-    emhass_config_soc_init: |-
-      {%- set min_soc = 20 -%}
-      {%- set max_soc = 100 -%}
-      {%- set reported_soc = states('sensor.scb_battery_soc') | float(0) -%}
-      {%- set mapped_soc = (reported_soc - min_soc) / (max_soc - min_soc) -%}
-      {{ [mapped_soc, 0] | max | round(2) }}
+    emhass_config_soc_init: >-
+      {{ (states('sensor.scb_battery_soc') | float(10) / 100) | round(2) }}
     emhass_config_soc_final: >-
       {%- set current_time = now().time() -%}
 
@@ -113,10 +109,11 @@ use_blueprint:
     emhass_config_inverter_ac_output_max: 10000
     emhass_config_inverter_ac_input_max: 10000
     emhass_config_set_nocharge_from_grid: false
-    emhass_config_battery_minimum_state_of_charge: 0.05
+    emhass_config_battery_minimum_state_of_charge: 0.10
     notify_group_name: parents_mobile_phones
     enable_optim_failure_notification: true
     emhass_config_set_nodischarge_to_grid: true
     emhass_config_compute_curtailment: true
     emhass_config_costfun: cost
     emhass_config_photovoltaic_production_sell_price: 0.082
+    emhass_host: "127.0.0.1"
