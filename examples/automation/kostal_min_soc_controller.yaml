@@ -136,7 +136,9 @@ actions:
                               value: "{{ wallbox_allowed_min_soc }}"
                     default:
                       - variables:
-                          protect_soc: "{{ [base_min_soc, [current_soc, 90] | min] | max }}"
+                          protect_soc: >-
+                            {% set rounded_current = ((current_soc / 5) | round(0, 'ceil') * 5) | int(base_min_soc) %}
+                            {{ [base_min_soc, [rounded_current, 90] | min] | max }}
                       - action: number.set_value
                         target:
                           entity_id: number.scb_battery_min_soc
