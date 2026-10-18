@@ -148,9 +148,10 @@ class HomeAssistantMockEnv:
     
     def filter_bool(self, value, default=False):
         if isinstance(value, jinja2.Undefined): return default
-        if str(value).lower() in ("true", "1", "yes", "on"):
+        val_str = str(value).strip().lower()
+        if val_str in ("true", "1", "yes", "on"):
             return True
-        if str(value).lower() in ("false", "0", "no", "off", "none"):
+        if val_str in ("false", "0", "no", "off", "none"):
             return False
         return bool(value)
 
