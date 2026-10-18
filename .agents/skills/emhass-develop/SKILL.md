@@ -89,10 +89,28 @@ The go-eCharger controller (`examples/blueprints/emhass_basic_trigger_go_echarge
 
 ## 4. Battery Storage & SoC Management
 
+### Kostal Plenticore Sensor Quirk: Real PV vs. Total Inverter DC Power
+- **Hardware Quirk:** On Kostal Plenticore inverters with a high-voltage battery connected to DC3, `sensor.scb_solar_power` reports total inverter DC power:
+  $$\text{Power} = \text{DC1} + \text{DC2} + \text{Battery Discharge (DC3)}$$
+- **Critical Rule:** Never use `sensor.scb_solar_power` to determine available solar generation during battery discharge. It causes a runaway positive feedback loop where battery discharge into the car is misidentified as solar surplus.
+- **Actual Solar Generation Calculation:**
+  ```jinja2
+  {{ (states('sensor.scb_dc1_power') | float(0.0)) + (states('sensor.scb_dc2_power') | float(0.0)) }}
+  ```
+
 ### Kostal Min SoC Controller (`examples/automation/kostal_min_soc_controller.yaml`)
-- Dynamically manages minimum SoC of the home storage battery based on season and daily Solcast forecast:
-  - **Daytime with high solar forecast:** Lowers min SoC (e.g. 10%) so battery can be fully utilized.
-  - **Overcast winter / Night:** Raises min SoC (e.g. 15-20%) to maintain emergency reserve and reduce cyclic stress.
+Dynamically controls `number.scb_battery_min_soc` and coordinates with EMHASS and Wallbox modes:
+- **Case 1: Battery Grid Charging (`input_select.pv_battery_emhass_status` in `running`, `force`)**:
+  - Sets `scb_battery_min_soc` to `emhass_calc_soc` (rounded up to 5% increments from `sensor.soc_batt_forecast`).
+- **Case 2: EV Charging at Wallbox (`input_select.wallbox_emhass_status` active)**:
+  - **Subcase 2a: PV Surplus Mode (`select.goe_297534_lmo == '4'`)**:
+    - If real PV ($DC1+DC2 \ge 1500\text{ W}$) **and** Solcast remaining forecast $\ge 3.0\text{ kWh}$: Allows battery buffering down to 10% (`wallbox_allowed_min_soc`).
+    - Otherwise (cloudy/evening): Protects home battery by locking `scb_battery_min_soc` to `current_soc`.
+  - **Subcase 2b: EMHASS Scheduled Charging / Grid Mode (`select.goe_297534_lmo != '4'`)**:
+    - Aligns directly with EMHASS's global cost-optimal schedule.
+    - Sets `scb_battery_min_soc` to `emhass_calc_soc` (`sensor.soc_batt_forecast`). Kostal will cover any minor planned battery assistance, but will never drain the battery below the forecast level, reserving home battery capacity for expensive peak hours.
+- **Default (Idle)**:
+  - When neither grid charging nor Wallbox is active, resets `scb_battery_min_soc` to 10% and ensures `select.battery_charging_usage_mode` is `None`.
 
 ### EMHASS PV Battery Status Controller (`examples/automation/emhass_pv_battery_status_controller.yaml`)
 - Interprets EMHASS `sensor.p_batt_forecast` to manage home battery charging and discharging.
