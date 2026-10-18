@@ -80,6 +80,17 @@ The go-eCharger controller (`examples/blueprints/emhass_basic_trigger_go_echarge
   - **Deficit Situation (e.g. 40.5 kWh needed vs 14.5 kWh forecast):**
     Surplus mode evaluates to `false`. Status stays `wait`. EMHASS optimizes charging during cheap night hours via `p_deferrable4`.
 
+### Priority & Active Charging Control Loop:
+- **Plan Latching & Surplus Override Protection**:
+  When EMHASS has scheduled power (`sensor.p_deferrable4 > 0`) or when `force` / `force-X` is selected, surplus mode is prevented from overriding the running plan. Surplus mode only takes effect when EMHASS has no scheduled power (`trigger_sensor_value == 0`) and the system is not in force mode.
+- **Active Charging Control Loop**:
+  Runs while the EV is connected and charging (`running` or `force*`):
+  1. **Full Charge Detection:** When `sensor.emhass_go_echarger_trigger < 10` Wh (target SoC reached), stops charging (`frc = 1`), disables surplus (`fup = off`), sets status and JSON to `done`, and exits the loop.
+  2. **Force Mode:** Guarantees charging to 100% full at 16A (or selected `force-X` current). Never interrupted by zero EMHASS power.
+  3. **EMHASS Basic Mode (Mode 3):** When `p_deferrable4 > 0`, modulates current dynamically ($A = \text{clamp}(\lceil P / 690 \rceil, 6, 16)$) and keeps `fup = off`.
+  4. **Surplus Eco Mode (Mode 4):** When `p_deferrable4 == 0` and surplus is enabled, sets Mode 4 at 16A with `fup = on` and continuously streams `set_pv_data` (grid, pv, battery).
+  5. **Disconnection Cleanup:** When the EV is unplugged, automatically sets `frc = 1`, `fup = off`, and marks status `done`.
+
 ### Key Wallbox Sensors:
 - `binary_sensor.goe_297534_car_0`: Car connected to wallbox (`on` / `off`).
 - `sensor.vr3ezzkxzpj688123_batterie`: EV battery SoC (%).
@@ -124,16 +135,16 @@ To protect the battery cells and avoid rapid cycling around the emergency reserv
    ```
 
 ### Kostal Min SoC Controller (`examples/automation/kostal_min_soc_controller.yaml`)
-Dynamically controls `number.scb_battery_min_soc` and coordinates with EMHASS and Wallbox modes:
+Dynamically controls `number.scb_battery_min_soc` and coordinates with EMHASS and Wallbox modes. All calculations enforce ceiling rounding to 5% steps (`ceil(soc / 5) * 5`) clamped to `[base_min_soc, 90]`:
 - **Case 1: Battery Grid Charging (`input_select.pv_battery_emhass_status` in `running`, `force`)**:
-  - Sets `scb_battery_min_soc` to `emhass_calc_soc` (clamped between `base_min_soc` and 90%, rounded up to 5% increments from `sensor.soc_batt_forecast`).
+  - Sets `scb_battery_min_soc` to `emhass_calc_soc` (forecast SoC from `sensor.soc_batt_forecast`, rounded up to 5% steps and clamped between `base_min_soc` and 90%).
 - **Case 2: EV Charging at Wallbox (`input_select.wallbox_emhass_status` active)**:
   - **Subcase 2a: PV Surplus Mode (`select.goe_297534_lmo == '4'`)**:
     - If real PV ($DC1+DC2 \ge 1500\text{ W}$) **and** Solcast remaining forecast $\ge 3.0\text{ kWh}$: Allows battery buffering down to `wallbox_allowed_min_soc` (`base_min_soc`, i.e., 20% if recovering, 10% otherwise).
-    - Otherwise (cloudy/evening): Protects home battery by locking `scb_battery_min_soc` to `protect_soc` (`[base_min_soc, current_soc] | max`).
+    - Otherwise (cloudy/evening): Protects home battery by locking `scb_battery_min_soc` to `protect_soc` (`[base_min_soc, current_soc] | max`, rounded up to 5% steps).
   - **Subcase 2b: EMHASS Scheduled Charging / Grid Mode (`select.goe_297534_lmo != '4'`)**:
     - Aligns directly with EMHASS's global cost-optimal schedule.
-    - Sets `scb_battery_min_soc` to `emhass_calc_soc` (`sensor.soc_batt_forecast`). Kostal will cover any minor planned battery assistance, but will never drain the battery below the forecast level, reserving home battery capacity for expensive peak hours.
+    - Sets `scb_battery_min_soc` to `emhass_calc_soc` (`sensor.soc_batt_forecast`, rounded up to 5% steps). Kostal will cover any minor planned battery assistance, but will never drain the battery below the forecast level, reserving home battery capacity for expensive peak hours.
 - **Default (Idle)**:
   - When neither grid charging nor Wallbox is active, resets `scb_battery_min_soc` to `base_min_soc` (10%, or 20% if recovering) and ensures `select.battery_charging_usage_mode` is `None`.
 

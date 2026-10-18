@@ -13,9 +13,10 @@
       {% set plan_start = emhass_data.ss | int(0) %}
       {% set power_nom_w = emhass_data.po | float(0.0) %}
       {% set hours_op = emhass_data.ho | float(0.0) %}
+      {% set current_us = emhass_data.us | default('done') %}
       {% if goe_plugged == false %}
         {{ 0 }}
-      {% elif plan_start == 0 %}
+      {% elif current_us != 'running' or hours_op == 0 %}
         {% set current_soc_pct = states('sensor.vr3ezzkxzpj688123_batterie') | float(0.0) %}
         {% set current_energy_net_wh = batt_capacity_wh * (current_soc_pct / 100) %}
         {% set target_energy_net_wh = batt_capacity_wh * (target_soc_pct / 100) %}

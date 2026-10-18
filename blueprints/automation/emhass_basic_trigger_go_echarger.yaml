@@ -996,9 +996,10 @@ actions:
           {% elif
             config.trigger_sensor_value == 0 and
             config.trigger_strategy_value in ['3', '4', '5', '6'] and
+            not (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) and
             (
-              (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
-              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+              (config.emhass_us in ['running', 'none', 'done']) or
+              (config.status_sensor_value in ['running']) or
               config.allow_allways_to_done_value == true
             )
           %}
@@ -1034,7 +1035,7 @@ actions:
         {% elif (res.automation_action == 'running' or config.emhass_us == 'running') and (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status force running'] %}
           {% set res.goe_charging = "0" %}
-          {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(config.goe_power_number_sensor_default) | int %}
+          {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(16, true) | int(16) %}
         {% elif res.automation_action == 'running' %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status normal running'] %}
           {% set res.goe_charging = "0" %}
@@ -1140,7 +1141,10 @@ actions:
         {% if
           (config.goe_pv_surplus_enabled == true) and
           (config.goe_pluged_binary_sensor_value == true) and
-          (res.new_us in ['wait', 'running'])
+          (res.new_us in ['wait', 'running']) and
+          (config.trigger_sensor_value == 0) and
+          not (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) and
+          not (res.new_us == 'force' or (res.new_us).startswith('force-'))
         %}
           {% set res.log_msg = res.log_msg + ['Overwrite settings for status running in surplus mode ' + res.automation_action + ' - ' + res.new_us] %}
           {% set res.goe_power = 16 %}
@@ -1458,57 +1462,264 @@ actions:
           - action: switch.turn_off
             target:
               entity_id: !input goe_surplus_sensor
-  - alias: check go surplus is enabled and the car is connected
+  - alias: Active charging control loop for go-echarger
     if:
       - condition: template
         value_template: >
           {% set config = context | from_json %}
-          {% if
-            (config.result.goe.surplus_enabled_config | default(false) | bool) and
-            (config.result.goe.pluged | default(false) | bool) and
-            (config.result.goe.logic_mode == "4")
-          %}
-            {{ true }}
-          {% else %}
-            {{ false }}
-          {% endif %}
+          {% set target_st = config.result.target_status | default('done') | string %}
+          {{ (config.result.goe.pluged | default(false) | bool) and (target_st in ['running', 'force'] or target_st.startswith('force-')) }}
     then:
       - repeat:
           while:
-            - condition: state
-              entity_id: !input goe_pluged_binary_sensor
-              state:
-                - "on"
-            - condition: not
-              conditions:
-                - condition: state
-                  entity_id: !input input_status
-                  state:
-                    - done
-                    - force
-                    - force-6
-                    - force-10
-                    - force-12
-                    - force-14
-                    - force-16
+            - condition: template
+              value_template: >
+                {% set pluged = is_state(input_goe_pluged_binary_sensor, 'on') %}
+                {% set st = states(input_status_sensor) | default('done') %}
+                {{ pluged and (st in ['running', 'force'] or st.startswith('force-')) }}
           sequence:
             - variables:
-                pgrid_value_sensor: !input goe_grid_single_entity
-                ppv_value_sensor: !input goe_pv_entities
-                pakku_value_sensor: !input goe_battery_entity
-                pgrid_value: "{{ states(pgrid_value_sensor) | float(0) }}"
-                ppv_value: "{{ expand(ppv_value_sensor) | map(attribute='state') | map('float', 0) | sum }}"
-                pakku_value: "{{ states(pakku_value_sensor) | float(0) }}"
-            - action: goecharger_api2.set_pv_data
-              data:
-                pgrid: '{{ pgrid_value | round(0) | int }}'
-                ppv: '{{ ppv_value | round(0) | int }}'
-                pakku: '{{ pakku_value | round(0) | int }}'
+                cur_status: "{{ states(input_status_sensor) | default('done') }}"
+                stop_val: "{{ states(input_stop_sensor) | float(9999) }}"
+                stop_thresh: "{{ input_stop_value | float(10) }}"
+                emhass_p: "{{ states(input_trigger_sensor) | float(0) }}"
+                surplus_ok: "{{ input_goe_pv_surplus_enabled | bool(false) }}"
+                pgrid_val: "{{ states(input_goe_grid_single_entity) | float(0) }}"
+                ppv_val: "{{ expand(input_goe_pv_entities) | map(attribute='state') | map('float', 0) | sum }}"
+                pakku_val: "{{ states(input_goe_battery_entity) | float(0) }}"
+            - if:
+                - condition: template
+                  value_template: "{{ cur_status == 'running' and stop_val < stop_thresh }}"
+              then:
+                - action: select.select_option
+                  data:
+                    option: "1"
+                  target:
+                    entity_id: !input goe_allow_charging_select
+                - action: switch.turn_off
+                  target:
+                    entity_id: !input goe_surplus_sensor
+                - action: input_select.select_option
+                  data:
+                    option: "done"
+                  target:
+                    entity_id: !input input_status
+                - action: input_text.set_value
+                  data:
+                    value: >
+                      {% set cur_json = states(input_emhass_sensor) | from_json(default={}) %}
+                      {{ cur_json | combine({'us': 'done', 'needs_optim': false, 'ss': 0, 'ho': 0.0, 'po': 0, 'st': 0, 'et': 0}) | to_json }}
+                  target:
+                    entity_id: !input input_emhass
+              else:
+                - choose:
+                    # --- Branch 1: Force mode (charge car to 100% at specified or default 16A) ---
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ cur_status == 'force' or cur_status.startswith('force-') }}"
+                      sequence:
+                        - variables:
+                            force_amp: >
+                              {% if cur_status == 'force' %}
+                                16
+                              {% else %}
+                                {{ cur_status | regex_findall_index('[0-9]+') | default(16, true) | int(16) }}
+                              {% endif %}
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_logic_mode) != '3' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "3"
+                              target:
+                                entity_id: !input goe_logic_mode
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_allow_charging_select) != '0' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "0"
+                              target:
+                                entity_id: !input goe_allow_charging_select
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_power_number_sensor) | int(0) != force_amp | int }}"
+                          then:
+                            - action: number.set_value
+                              data:
+                                value: "{{ force_amp | int }}"
+                              target:
+                                entity_id: !input goe_power_number_sensor
+                        - if:
+                            - condition: template
+                              value_template: "{{ is_state(input_goe_surplus_sensor, 'on') }}"
+                          then:
+                            - action: switch.turn_off
+                              target:
+                                entity_id: !input goe_surplus_sensor
+
+                    # --- Branch 2: Normal EMHASS Scheduled Power (Basic Mode 3) ---
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ cur_status == 'running' and emhass_p > 0 }}"
+                      sequence:
+                        - variables:
+                            calc_amp: >
+                              {% set amp_raw = (([emhass_p, 4140] | max) / (230 * 3)) | round(0, 'ceil') | int %}
+                              {{ [amp_raw, 16] | min }}
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_logic_mode) != '3' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "3"
+                              target:
+                                entity_id: !input goe_logic_mode
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_allow_charging_select) != '0' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "0"
+                              target:
+                                entity_id: !input goe_allow_charging_select
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_power_number_sensor) | int(0) != calc_amp | int }}"
+                          then:
+                            - action: number.set_value
+                              data:
+                                value: "{{ calc_amp | int }}"
+                              target:
+                                entity_id: !input goe_power_number_sensor
+                        - if:
+                            - condition: template
+                              value_template: "{{ is_state(input_goe_surplus_sensor, 'on') }}"
+                          then:
+                            - action: switch.turn_off
+                              target:
+                                entity_id: !input goe_surplus_sensor
+
+                    # --- Branch 3: Surplus Eco Mode (emhass_p == 0 and surplus enabled) ---
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ cur_status == 'running' and emhass_p == 0 and surplus_ok }}"
+                      sequence:
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_logic_mode) != '4' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "4"
+                              target:
+                                entity_id: !input goe_logic_mode
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_allow_charging_select) != '0' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "0"
+                              target:
+                                entity_id: !input goe_allow_charging_select
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_power_number_sensor) | int(0) != 16 }}"
+                          then:
+                            - action: number.set_value
+                              data:
+                                value: 16
+                              target:
+                                entity_id: !input goe_power_number_sensor
+                        - if:
+                            - condition: template
+                              value_template: "{{ not is_state(input_goe_surplus_sensor, 'on') }}"
+                          then:
+                            - action: switch.turn_on
+                              target:
+                                entity_id: !input goe_surplus_sensor
+                        - action: goecharger_api2.set_pv_data
+                          data:
+                            pgrid: '{{ pgrid_val | round(0) | int }}'
+                            ppv: '{{ ppv_val | round(0) | int }}'
+                            pakku: '{{ pakku_val | round(0) | int }}'
+
+                    # --- Branch 4: Neither EMHASS Power nor Surplus (Pause or Done) ---
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ cur_status == 'running' and emhass_p == 0 and not surplus_ok }}"
+                      sequence:
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(input_goe_allow_charging_select) != '1' }}"
+                          then:
+                            - action: select.select_option
+                              data:
+                                option: "1"
+                              target:
+                                entity_id: !input goe_allow_charging_select
+                        - if:
+                            - condition: template
+                              value_template: "{{ is_state(input_goe_surplus_sensor, 'on') }}"
+                          then:
+                            - action: switch.turn_off
+                              target:
+                                entity_id: !input goe_surplus_sensor
+                        - if:
+                            - condition: template
+                              value_template: "{{ input_allow_allways_to_done | bool }}"
+                          then:
+                            - action: input_select.select_option
+                              data:
+                                option: "done"
+                              target:
+                                entity_id: !input input_status
+                            - action: input_text.set_value
+                              data:
+                                value: >
+                                  {% set cur_json = states(input_emhass_sensor) | from_json(default={}) %}
+                                  {{ cur_json | combine({'us': 'done', 'needs_optim': false, 'ss': 0, 'ho': 0.0, 'po': 0, 'st': 0, 'et': 0}) | to_json }}
+                              target:
+                                entity_id: !input input_emhass
             - delay:
                 hours: 0
                 minutes: 0
                 seconds: 5
                 milliseconds: 0
+      - alias: Cleanup after charging loop ends
+        if:
+          - condition: template
+            value_template: "{{ not is_state(input_goe_pluged_binary_sensor, 'on') }}"
+        then:
+          - action: select.select_option
+            data:
+              option: "1"
+            target:
+              entity_id: !input goe_allow_charging_select
+          - action: switch.turn_off
+            target:
+              entity_id: !input goe_surplus_sensor
+          - if:
+              - condition: template
+                value_template: "{{ states(input_status_sensor) != 'done' }}"
+            then:
+              - action: input_select.select_option
+                data:
+                  option: "done"
+                target:
+                  entity_id: !input input_status
+              - action: input_text.set_value
+                data:
+                  value: >
+                    {% set cur_json = states(input_emhass_sensor) | from_json(default={}) %}
+                    {{ cur_json | combine({'us': 'done', 'needs_optim': false, 'ss': 0, 'ho': 0.0, 'po': 0, 'st': 0, 'et': 0}) | to_json }}
+                target:
+                  entity_id: !input input_emhass
   - alias: Wait for running sensor delay
     delay:
       hours: 0
