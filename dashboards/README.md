@@ -40,4 +40,4 @@ To render these dashboards correctly, ensure the following custom cards are inst
   - Add the room to the left-hand navigation menu in `kiosk.yaml`.
   - Maintain the design language: Keep elements modern, clean, and use dynamic icons and CSS borders indicating presence.
 * **Modifying Layouts**:
-  - When changing sensor sources, verify the corresponding entity IDs match the naming standards in [CODING_STANDARDS.md](../CODING_STANDARDS.md).
+  - When changing sensor sources, verify the corresponding entity IDs match the naming standards in [AGENTS.md](../AGENTS.md).
