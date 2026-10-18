@@ -1,0 +1,65 @@
+alias: EMHASS PV Battery Status Controller
+description: "Controls the grid charging status helper (input_select.pv_battery_emhass_status) based on EMHASS battery power, grid power, and SoC forecasts."
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.p_batt_forecast
+    for:
+      seconds: 5
+  - trigger: state
+    entity_id:
+      - sensor.p_grid_forecast
+    for:
+      seconds: 5
+  - trigger: state
+    entity_id:
+      - sensor.scb_battery_soc
+    for:
+      seconds: 5
+  - trigger: time_pattern
+    minutes: "/5"
+conditions: []
+actions:
+  - variables:
+      p_batt: "{{ states('sensor.p_batt_forecast') | float(0.0) }}"
+      p_grid: "{{ states('sensor.p_grid_forecast') | float(0.0) }}"
+      p_load: "{{ states('sensor.p_load_forecast') | float(0.0) }}"
+      target_soc: "{{ states('sensor.soc_batt_forecast') | float(0.0) }}"
+      current_soc: "{{ states('sensor.scb_battery_soc') | float(0.0) }}"
+      current_status: "{{ states('input_select.pv_battery_emhass_status') }}"
+
+  - choose:
+      # Condition to start TRUE grid charging:
+      # 1. EMHASS plans battery charging (p_batt < -500 W)
+      # 2. EMHASS plans grid import exceeding household baseline consumption (p_grid > p_load + 500 W)
+      # 3. Current battery SoC is still below target SoC
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ current_status in ['done', 'wait'] and
+                 p_batt < -500 and
+                 p_grid > (p_load + 500) and
+                 current_soc < target_soc }}
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.pv_battery_emhass_status
+            data:
+              option: "running"
+
+      # Condition to stop grid charging:
+      # When status is running and either:
+      # - EMHASS is no longer planning grid charge (p_batt >= -100 or p_grid <= p_load) OR
+      # - Target SoC reached
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ current_status == 'running' and
+                 (p_batt >= -100 or p_grid <= p_load or current_soc >= target_soc) }}
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.pv_battery_emhass_status
+            data:
+              option: "done"
+mode: restart

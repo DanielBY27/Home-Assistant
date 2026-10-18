@@ -235,8 +235,8 @@ You can find my complete automation configurations here:
     - Stop Trigger is a 10-minute statistic sensor for this Zigbee device
 - PV Battery
     - [Configuration](./examples/blueprints/emhass_basic_trigger_pv_battery.yaml)
-    - Start Trigger Cron
-    - Stop Trigger EMHASS or [sensor](./examples/sensors/emhass_pv_battery_load_from_grid_in.yaml)
+    - [Kostal min SoC Controller](./examples/automation/kostal_min_soc_controller.yaml)
+    - [EMHASS PV Battery Status Controller](./examples/automation/emhass_pv_battery_status_controller.yaml)
     - To charge my BYD battery with my Kostal inverter via the grid, I need another blueprint to enable charging via Modbus
 
         [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A//raw.githubusercontent.com/DanielBY27/Home-Assistant/refs/heads/main/blueprints/automation/emhass_modbus_writer.yaml)

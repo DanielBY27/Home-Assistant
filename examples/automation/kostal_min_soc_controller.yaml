@@ -1,49 +1,84 @@
 alias: Kostal min SoC Controller
-description: ""
+description: "Controls the minimum SoC of the Kostal inverter based on EMHASS targets and protects the home battery during Wallbox EV charging only when insufficient PV power or forecast is available."
 triggers:
-  - trigger: state
-    entity_id:
-      - number.scb_battery_min_soc
-    for:
-      hours: 0
-      minutes: 0
-      seconds: 3
-    from: null
-    to: null
-  - trigger: state
-    entity_id:
-      - sensor.scb_battery_soc
-    for:
-      hours: 0
-      minutes: 0
-      seconds: 3
-    from: null
-    to: null
   - trigger: state
     entity_id:
       - input_select.pv_battery_emhass_status
     for:
-      hours: 0
-      minutes: 0
-      seconds: 5
+      seconds: 3
   - trigger: state
     entity_id:
       - input_select.wallbox_emhass_status
     for:
-      hours: 0
-      minutes: 0
+      seconds: 3
+  - trigger: state
+    entity_id:
+      - sensor.soc_batt_forecast
+    for:
       seconds: 5
+  - trigger: state
+    entity_id:
+      - sensor.scb_battery_soc
+    for:
+      seconds: 5
+  - trigger: state
+    entity_id:
+      - sensor.scb_solar_power
+    for:
+      seconds: 15
+  - trigger: state
+    entity_id:
+      - sensor.solcast_pv_forecast_prognose_verbleibende_leistung_heute
+    for:
+      seconds: 15
 conditions: []
 actions:
-  - if:
-      - condition: template
-        value_template: >
-          {% set scb_soc = states('number.scb_battery_min_soc') | default(10) |
-          int %} {% set pv_bat =
-          states('sensor.emhass_pv_battery_load_from_grid_in') | default(0) |
-          int %} {{ scb_soc <= pv_bat and pv_bat > 0 }}
-      - condition: or
-        conditions:
+  - variables:
+      # --- Configurable thresholds for Wallbox battery support ---
+      # Minimum solar power (W) above which home battery may support the Wallbox:
+      min_pv_power_threshold: 1500
+      # Remaining PV forecast for today (kWh) above which support is permitted:
+      min_remaining_pv_kwh: 3.0
+      # Lower bound (SoC %) down to which the battery may discharge into the car when PV forecast is sufficient:
+      wallbox_allowed_min_soc: 10
+
+      # Current readings and forecasts
+      current_soc: "{{ states('sensor.scb_battery_soc') | int(10) }}"
+      pv_power: "{{ states('sensor.scb_solar_power') | float(0.0) }}"
+      solcast_remaining_today: "{{ states('sensor.solcast_pv_forecast_prognose_verbleibende_leistung_heute') | float(0.0) }}"
+      pv_forecast_24h: "{{ (state_attr('sensor.p_pv_forecast', 'forecasts') | default([], true) | map(attribute='p_pv_forecast') | map('float', 0.0) | sum) * 0.25 }}"
+      load_forecast_24h: "{{ (state_attr('sensor.p_load_forecast', 'forecasts') | default([], true) | map(attribute='p_load_forecast') | map('float', 0.0) | sum) * 0.25 }}"
+
+  # Compute derived condition in a separate variables step to ensure inputs are resolved
+  - variables:
+      # Check whether sufficient PV power or forecast is available:
+      has_enough_pv: >-
+        {{ pv_power >= min_pv_power_threshold or
+           solcast_remaining_today >= min_remaining_pv_kwh or
+           (pv_forecast_24h > load_forecast_24h and is_state('sun.sun', 'above_horizon')) }}
+
+  - choose:
+      # Case 1: EMHASS grid charging active for home battery
+      - conditions:
+          - condition: state
+            entity_id: input_select.pv_battery_emhass_status
+            state:
+              - running
+              - force
+        sequence:
+          - variables:
+              target_soc: "{{ states('sensor.soc_batt_forecast') | float(50.0) }}"
+          - variables:
+              # Round up to 5% increments, clamped between 10% and 90%
+              calc_soc: "{{ [10, [((target_soc / 5) | round(0, 'ceil') * 5) | int(10), 90] | min] | max }}"
+          - action: number.set_value
+            target:
+              entity_id: number.scb_battery_min_soc
+            data:
+              value: "{{ calc_soc }}"
+
+      # Case 2: EV charging at Wallbox
+      - conditions:
           - condition: state
             entity_id: input_select.wallbox_emhass_status
             state:
@@ -54,53 +89,45 @@ actions:
               - force-12
               - force-14
               - force-16
-          - condition: state
-            entity_id: input_select.pv_battery_emhass_status
-            state:
-              - running
-              - force
-    then:
-      - variables:
-          newMinSoc: >
-            {% set source_soc = states('number.scb_battery_min_soc') |
-            default(10) | int %}  {% set soc_value =
-            states('sensor.scb_battery_soc') | default(10) | int %} {% set
-            source_sensor = states('sensor.emhass_pv_battery_load_from_grid_in')
-            | default(10) | int %} {% set new_max = [source_soc, source_sensor]
-            | max | int %}  {% set new_value = [soc_value, new_max, 70] | min |
-            int %}  {% set calc_pct_round = ((new_value / 5) | round(0, 'ceil')
-            * 5) | int %} {% if source_soc >= calc_pct_round %}
-              {{ source_soc }}
-            {% else %}
-              {{ calc_pct_round }}
-            {% endif %}
+        sequence:
+          - choose:
+              # Case 2a: Sufficient PV power or forecast -> home battery may support Wallbox!
+              # min_soc remains at base/allowed SoC to avoid grid import.
+              - conditions:
+                  - condition: template
+                    value_template: "{{ has_enough_pv }}"
+                sequence:
+                  - action: number.set_value
+                    target:
+                      entity_id: number.scb_battery_min_soc
+                    data:
+                      value: "{{ wallbox_allowed_min_soc }}"
+
+              # Case 2b: Insufficient PV / night / overcast -> protect home battery from draining into EV!
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not has_enough_pv }}"
+                sequence:
+                  - variables:
+                      protect_soc: "{{ [10, [current_soc, 90] | min] | max }}"
+                  - action: number.set_value
+                    target:
+                      entity_id: number.scb_battery_min_soc
+                    data:
+                      value: "{{ protect_soc }}"
+
+    # Default (neither grid charging nor Wallbox active): reset to base value (10%)
+    default:
       - action: number.set_value
-        metadata: {}
         target:
           entity_id: number.scb_battery_min_soc
         data:
-          value: "{{ newMinSoc }}"
-    else:
-      - if:
-          - condition: template
-            value_template: >
-              {% set wallbox = states('input_select.wallbox_emhass_status') %}
-              {% set pv_bat_status =
-              states('input_select.pv_battery_emhass_status') %} {{ wallbox not
-              in ['running', 'force', 'force-6', 'force-10', 'force-12',
-              'force-14', 'force-16'] and 
-                 pv_bat_status not in ['running', 'force'] }}
-        then:
-          - action: number.set_value
-            metadata: {}
-            target:
-              entity_id: number.scb_battery_min_soc
-            data:
-              value: "10"
+          value: 10
+
+  # Always ensure Kostal usage mode is set to None
   - action: select.select_option
-    metadata: {}
     target:
       entity_id: select.battery_charging_usage_mode
     data:
-      option: None
+      option: "None"
 mode: restart

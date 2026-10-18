@@ -118,3 +118,5 @@ use_blueprint:
     enable_optim_failure_notification: true
     emhass_config_set_nodischarge_to_grid: true
     emhass_config_compute_curtailment: true
+    emhass_config_costfun: cost
+    emhass_config_photovoltaic_production_sell_price: 0.082
