@@ -7,16 +7,16 @@
       {% set target_soc_pct = 95 %}
       {% set batt_capacity_wh = 50000 %}
       {% set efficiency_factor = 0.925 %}
-      {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') | bool %}
-      {% set goe_loaded_wh = (states('sensor.goe_297534_wh') | float(0)) * 1000 %}
+      {% set goe_plugged = is_state('binary_sensor.goe_297534_car_0', 'on') | bool(false) %}
+      {% set goe_loaded_wh = (states('sensor.goe_297534_wh') | float(0.0)) * 1000 %}
       {% set emhass_data = states('input_text.wallbox_emhass_json') | from_json %}
       {% set plan_start = emhass_data.ss | int(0) %}
-      {% set power_nom_w = emhass_data.po | float(0) %}
-      {% set hours_op = emhass_data.ho | float(0) %}
+      {% set power_nom_w = emhass_data.po | float(0.0) %}
+      {% set hours_op = emhass_data.ho | float(0.0) %}
       {% if goe_plugged == false %}
         {{ 0 }}
       {% elif plan_start == 0 %}
-        {% set current_soc_pct = states('sensor.vr3ezzkxzpj688123_batterie') | float(0) %}
+        {% set current_soc_pct = states('sensor.vr3ezzkxzpj688123_batterie') | float(0.0) %}
         {% set current_energy_net_wh = batt_capacity_wh * (current_soc_pct / 100) %}
         {% set target_energy_net_wh = batt_capacity_wh * (target_soc_pct / 100) %}
         {% set energy_needed_net_wh = target_energy_net_wh - current_energy_net_wh %}

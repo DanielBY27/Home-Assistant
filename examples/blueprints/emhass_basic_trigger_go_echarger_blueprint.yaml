@@ -12,8 +12,7 @@ use_blueprint:
     operating_hours: >-
       {% set nominal_power_w = 11000 %}
 
-      {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
-      float(0) %}
+      {% set power_needed = states('sensor.emhass_go_echarger_trigger') | float(0.0) %}
 
       {% set raw_hours = power_needed / nominal_power_w %}
 
@@ -28,60 +27,41 @@ use_blueprint:
       {% endif %}
     start_timesteps: 0
     end_timesteps: >-
-      {# Wir rechnen nicht mit 11kW sondern lassen EMHASS luft um die beste Zeit
-      zu ermitteln #}
-
+      {# We do not calculate with 11 kW; we give EMHASS leeway to determine the optimal charging window #}
       {% set nominal_power_w = 7000 %}
-
-      {% set power_needed = states('sensor.emhass_go_echarger_trigger') |
-      float(0) %}
-
+      {% set power_needed = states('sensor.emhass_go_echarger_trigger') | float(0.0) %}
       {% set max_index = 96 %}
-
       {% set seconds_per_timestep = 15 * 60 %}
-
       {% set current_dt = now() %}
-
-      {% set min_timesteps_needed = (power_needed / nominal_power_w * 4) |
-      round(0, 'ceil') | int %}
-
+      {% set min_timesteps_needed = (power_needed / nominal_power_w * 4) | round(0, 'ceil') | int(0) %}
       {% set target_times_h_m_s = ["13:00:00", "17:00:00", "05:00:00"] %}
 
-      {# -------------------- TEST-BEREICH START -------------------- #}
-
-      {# set current_dt = now().replace(hour=13, minute=0, second=0,
-      microsecond=0) #}
-
+      {# -------------------- TEST AREA START -------------------- #}
+      {# set current_dt = now().replace(hour=13, minute=0, second=0, microsecond=0) #}
       {# set min_timesteps_needed = 14 #}
-
-      {# -------------------- TEST-BEREICH END ---------------------- #}
+      {# -------------------- TEST AREA END ---------------------- #}
 
       {% set current_time_ts = as_timestamp(current_dt) %}
-
-      {% set min_end_seconds_needed = min_timesteps_needed *
-      seconds_per_timestep %}
-
+      {% set min_end_seconds_needed = min_timesteps_needed * seconds_per_timestep %}
       {% set min_end_ts = current_time_ts + min_end_seconds_needed %}
-
       {% set ns = namespace(valid_end_timesteps=[max_index]) %}
 
       {% for target_time_str in target_times_h_m_s %}
-        {% set target_hour = target_time_str.split(':')[0] | int %}
-        {% set target_minute = target_time_str.split(':')[1] | int %}
+        {% set target_hour = target_time_str.split(':')[0] | int(0) %}
+        {% set target_minute = target_time_str.split(':')[1] | int(0) %}
         {% set today_target_dt = current_dt.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0) %}
         {% set tomorrow_target_dt = today_target_dt + timedelta(days=1) %}
         {% set check_timestamps = [as_timestamp(today_target_dt), as_timestamp(tomorrow_target_dt)] %}
         {% for target_ts in check_timestamps %}
           {% if target_ts >= min_end_ts %}
             {% set delta_seconds = target_ts - current_time_ts %}
-            {% set final_timestep = (delta_seconds / seconds_per_timestep) | round(0) | int %}
+            {% set final_timestep = (delta_seconds / seconds_per_timestep) | round(0) | int(0) %}
             {% set ns.valid_end_timesteps = ns.valid_end_timesteps + [final_timestep] %}
           {% endif %}
         {% endfor %}
       {% endfor %}
 
       {% set final_emhass_timestep = ns.valid_end_timesteps | min %}
-
       {{ [final_emhass_timestep, 1] | max }}
     minimum_power_deferrable_load: 4200
     deferrable_startup_penalty: 2
@@ -116,5 +96,15 @@ use_blueprint:
     goe_pv_entities:
       - sensor.scb_sum_power_of_all_pv_dc_inputs
     goe_pv_surplus_enabled: >-
-      {{ now().dst() is not none and now().dst().seconds > 0 and
-      is_state('sun.sun', 'above_horizon') }}
+      {% set is_day = is_state('sun.sun', 'above_horizon') %}
+      {% set current_month = now().month %}
+      {% if not is_day %}
+        {{ false }}
+      {% elif current_month in [5, 6, 7, 8, 9] %}
+        {{ true }}
+      {% else %}
+        {# In transition and winter months (October to April), enable surplus only if remaining PV forecast covers needed EV energy #}
+        {% set remaining_pv_kwh = states('sensor.solcast_pv_forecast_prognose_verbleibende_leistung_heute') | float(0.0) %}
+        {% set needed_kwh = (states('sensor.emhass_go_echarger_trigger') | float(0.0)) / 1000.0 %}
+        {{ needed_kwh > 0 and remaining_pv_kwh >= needed_kwh }}
+      {% endif %}
