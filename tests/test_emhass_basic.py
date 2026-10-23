@@ -17,8 +17,9 @@ def setup_basic_mock(overrides=None, trigger=None):
     # Apply specific state overrides
     if overrides:
         for entity_id, state_val in overrides.items():
-            if entity_id not in mock_data["states"]:
-                mock_data["states"][entity_id] = {"attributes": {}}
+            if entity_id not in mock_data["states"] or not isinstance(mock_data["states"][entity_id], dict):
+                prev_state = mock_data["states"].get(entity_id, "unknown")
+                mock_data["states"][entity_id] = {"state": str(prev_state), "attributes": {}}
                 
             if isinstance(state_val, dict):
                 if "state" in state_val:
@@ -111,4 +112,27 @@ def test_emhass_basic_notification_status_codes(status_code, notify_enabled, exp
     result = template.render(context=context_str, response={"status": status_code})
     
     assert (result.strip().lower() == "true") == expected_notification
+
+
+@pytest.mark.parametrize("now_iso, battery_soc, expected_soc_final", [
+    ("2026-10-23T22:00:00+02:00", "20", 0.3),   # Night (20-10h), current < min (0.20 < 0.30) -> 0.3
+    ("2026-10-23T08:00:00+02:00", "45", 0.45),  # Night/Morning (20-10h), current > min (0.45 > 0.30) -> 0.45
+    ("2026-10-23T12:00:00+02:00", "35", 0.5),   # First half day (10-16h), current < min (0.35 < 0.50) -> 0.5
+    ("2026-10-23T14:00:00+02:00", "65", 0.65),  # First half day (10-16h), current > min (0.65 > 0.50) -> 0.65
+    ("2026-10-23T18:00:00+02:00", "25", 0.4),   # Second half day (16-20h), current < min (0.25 < 0.40) -> 0.4
+    ("2026-10-23T19:00:00+02:00", "55", 0.55),  # Second half day (16-20h), current > min (0.55 > 0.40) -> 0.55
+])
+def test_emhass_basic_soc_final_calculation(now_iso, battery_soc, expected_soc_final):
+    """
+    Verifies that emhass_config_soc_final applies the time-based minimum SoC
+    (20-10h: 0.3, 10-16h: 0.5, 16-20h: 0.4) and preserves current_soc if higher.
+    """
+    mock_data = setup_basic_mock(overrides={"sensor.scb_battery_soc": battery_soc})
+    mock_data["now"] = now_iso
+    variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic.yaml', mock_data)
+    context_raw = variables["context"]
+    context_json = json.loads(context_raw) if isinstance(context_raw, str) else context_raw
+    optim_payload = context_json["result"]["optim"]
+    assert float(optim_payload["soc_final"]) == pytest.approx(expected_soc_final, 0.001)
+
 

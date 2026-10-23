@@ -1,5 +1,5 @@
 alias: EMHASS Basic Automation
-description: ""
+description: ''
 use_blueprint:
   path: emhass_basic.yaml
   input:
@@ -49,37 +49,28 @@ use_blueprint:
       {% else %}
         {{ ([0] * 96) }}
       {% endif %}
-    emhass_config_soc_init: >-
-      {{ (states('sensor.scb_battery_soc') | float(10) / 100) | round(2) }}
+    emhass_config_soc_init: '{{ (states(''sensor.scb_battery_soc'') | float(10) / 100) | round(2) }}'
     emhass_config_soc_final: >-
-      {%- set current_time = now().time() -%}
+      {%- set current_hour = now().hour -%}
 
-      {%- set sunrise_time = (state_attr('sun.sun', 'next_rising') | as_datetime
-      | as_local).time() -%}
+      {%- set current_soc = (states('sensor.scb_battery_soc') | float(10) / 100)
+      | round(2) -%}
 
-      {%- set sunset_time = (state_attr('sun.sun', 'next_setting') | as_datetime
-      | as_local).time() -%}
+      {%- set night_soc = 0.3 -%}
 
-      {%- set night_soc = 0.2 -%}
+      {%- set first_half_day_soc = 0.5 -%}
 
-      {%- set first_half_day_soc = 0.3 -%}
+      {%- set second_half_day_soc = 0.4 -%}
 
-      {%- set second_half_day_soc = 0.5 -%}
-
-      {%- if current_time > sunset_time or current_time < sunrise_time -%}
-        {{ night_soc }}
+      {%- if current_hour >= 10 and current_hour < 16 -%}
+        {%- set min_soc = first_half_day_soc -%}
+      {%- elif current_hour >= 16 and current_hour < 20 -%}
+        {%- set min_soc = second_half_day_soc -%}
       {%- else -%}
-        {%- set day_length_seconds = (sunset_time.hour * 3600 + sunset_time.minute * 60) - (sunrise_time.hour * 3600 + sunrise_time.minute * 60) -%}
-        {%- if day_length_seconds < 0 -%}
-          {%- set day_length_seconds = day_length_seconds + 86400 -%}
-        {%- endif -%}
-        {%- set mid_day_seconds = (sunrise_time.hour * 3600 + sunrise_time.minute * 60) + (day_length_seconds / 2) -%}
-        {%- if (current_time.hour * 3600 + current_time.minute * 60) < mid_day_seconds -%}
-          {{ first_half_day_soc }}
-        {%- else -%}
-          {{ second_half_day_soc }}
-        {%- endif -%}
+        {%- set min_soc = night_soc -%}
       {%- endif -%}
+
+      {{ [current_soc, min_soc] | max }}
     list_emhass_deferrable_loads:
       - input_text.dishwasher_emhass_json
       - input_text.tumble_dryer_emhass_json
@@ -93,27 +84,28 @@ use_blueprint:
     emhass_config_sensor_power_photovoltaics: sensor.scb_solar_power
     emhass_config_sensor_power_load_no_var_loads: sensor.emhass_config_home_power_no_var_loads
     emhass_config_load_forecast_method: mlforecaster
-    save_timer_hours: "5"
-    save_timer_minutes: "28"
+    save_timer_hours: '5'
+    save_timer_minutes: '28'
     enable_save_timer: true
     enable_forecast_timer: true
-    forecast_timer_hours: "5"
-    forecast_timer_minutes: "38"
+    forecast_timer_hours: '5'
+    forecast_timer_minutes: '38'
     enable_publish_timer: true
-    emhass_config_optimization_time_step: "15"
+    emhass_config_optimization_time_step: '15'
     emhass_config_historic_days_to_retrieve: 60
-    emhass_config_mlforecaster_payload_overwrite: "{\"split_date_delta\": \"60h\", \"sklearn_model\": \"GradientBoostingRegressor\"}"
+    emhass_config_mlforecaster_payload_overwrite: '{"split_date_delta": "60h", "sklearn_model": "GradientBoostingRegressor"}'
     automation_logger_level: INFO
     automation_trace_count: 30
     automation_started_manually: log
     emhass_config_inverter_ac_output_max: 10000
     emhass_config_inverter_ac_input_max: 10000
     emhass_config_set_nocharge_from_grid: false
-    emhass_config_battery_minimum_state_of_charge: 0.10
+    emhass_config_battery_minimum_state_of_charge: 0.1
     notify_group_name: parents_mobile_phones
     enable_optim_failure_notification: true
     emhass_config_set_nodischarge_to_grid: true
     emhass_config_compute_curtailment: true
     emhass_config_costfun: cost
     emhass_config_photovoltaic_production_sell_price: 0.082
-    emhass_host: "127.0.0.1"
+    emhass_host: 127.0.0.1
+    emhass_config_weight_battery_discharge: 0.28

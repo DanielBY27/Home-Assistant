@@ -118,6 +118,7 @@ The go-eCharger controller (`examples/blueprints/emhass_basic_trigger_go_echarge
     {{ (states('sensor.scb_battery_soc') | float(10) / 100) | round(2) }}
     ```
     Artificial compression or linear shifting (e.g., `(soc - 20) / 80`) must NOT be used, as it misrepresents actual available energy to the LP solver (falsely indicating an empty battery at 20% or only 19% at 35%).
+  - `emhass_config_soc_final`: Uses fixed time-window minimums (`night_soc = 0.3` for 20:00–10:00, `first_half_day_soc = 0.5` for 10:00–16:00, `second_half_day_soc = 0.4` for 16:00–20:00) combined with `[current_soc, min_soc] | max`. If the current battery SoC exceeds the window's minimum, EMHASS must restore at least `current_soc` by the end of the 24h horizon, preventing net battery depletion when EV charging is scheduled overnight and incentivizing grid charging during cheap tariff windows when solar forecast is insufficient.
 
 ### Battery Recovery Hysteresis (10% ↔ 20%)
 To protect the battery cells and avoid rapid cycling around the emergency reserve floor, the Kostal controller implements stateful hysteresis:
