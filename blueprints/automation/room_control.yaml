@@ -1,5 +1,5 @@
 blueprint:
-  name: Room Control (v202607)
+  name: Room Control (v202610)
   description: |
     Comprehensive room control automation that manages heating and roller shutters based on presence, window status, and sun position.
 
@@ -206,7 +206,7 @@ blueprint:
 # ----------------------------------
 
 variables:
-  blueprint_version: v202607
+  blueprint_version: v202610
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   tmp_entity_window: !input window_entity
   tmp_entity_presence: !input present_entity

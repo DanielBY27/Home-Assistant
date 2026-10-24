@@ -1,5 +1,5 @@
 blueprint:
-  name: EMHASS Deferrable Load Controller (v202604)
+  name: EMHASS Deferrable Load Controller (v202610)
   description: |
     This blueprint manages the complete lifecycle of a **single deferrable load** for EMHASS.
     It acts as the interface between your physical device (e.g., a switch) and the main `EMHASS Basic Automation`.
@@ -397,7 +397,7 @@ blueprint:
 # ----------------------------
 
 variables:
-  blueprint_version: v202604
+  blueprint_version: v202610
   automation_logger_name: homeassistant.components.automation.{{ this.entity_id.split('.')[1] }}
   input_automation_logger_level: !input automation_logger_level
   input_automation_trace_count: !input automation_trace_count

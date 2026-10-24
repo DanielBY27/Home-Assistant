@@ -84,16 +84,11 @@ flowchart TD
 4. **Apply Changes, Sync to Home Assistant & Commit**:
    Once confirmed:
    - Update both `name: ... (v...)` (line 2) and `blueprint_version: v...` (under `variables:`) in each affected file.
-   - Synchronize each updated blueprint to Home Assistant using `ha_manage_blueprints`:
-     ```json
-     {
-       "action": "save",
-       "domain": "automation",
-       "path": "<filename>.yaml",
-       "overwrite": true,
-       "yaml": "<full updated YAML content>"
-     }
+   - Synchronize the updated blueprints to Home Assistant via `scp` and reload automations via `ha_mcp` (fast and token-efficient):
+     ```powershell
+     scp blueprints/automation/*.yaml homeassistant:/config/blueprints/automation/
      ```
+     Followed by `ha_call_service(domain="automation", service="reload", wait=false)`.
    - Stage and commit the version bump on `develop`:
      ```powershell
      git add blueprints/automation/*.yaml
