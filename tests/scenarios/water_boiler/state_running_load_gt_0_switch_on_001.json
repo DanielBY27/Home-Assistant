@@ -1,0 +1,47 @@
+{
+    "_comment": "Water Boiler: stays in running when EMHASS load is > 0; switch.heisswasser_switch stays ON.",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_water_boiler.yaml",
+    "overrides": {
+        "input_select.water_bioler_emhass_status": "running",
+        "input_text.water_bioler_emhass_json": "{\"po\":1500,\"ho\":0.5,\"st\":0,\"et\":48,\"se\":false,\"si\":false,\"mp\":100,\"pe\":10,\"us\":\"running\",\"ss\":1774680000,\"needs_optim\":false}",
+        "sensor.p_deferrable3": {
+            "state": "1500",
+            "attributes": {
+                "deferrables_schedule": [
+                    {
+                        "p_deferrable3": 1500,
+                        "date": "2026-03-28T08:00:00+01:00"
+                    },
+                    {
+                        "p_deferrable3": 1500,
+                        "date": "2026-03-28T08:15:00+01:00"
+                    }
+                ]
+            }
+        },
+        "sensor.scb_battery_soc": "98",
+        "switch.heisswasser_switch": "on"
+    },
+    "trigger": {
+        "id": "cron",
+        "platform": "time_pattern"
+    },
+    "now": "2026-03-28T08:00:00+01:00",
+    "expected": {
+        "context": {
+            "target_status": "running",
+            "sensor": {
+                "type": "switch",
+                "name": "switch.heisswasser_switch",
+                "value_switch": "on"
+            },
+            "target_json": {
+                "us": "running",
+                "se": false,
+                "si": false,
+                "needs_optim": false
+            }
+        }
+    }
+}

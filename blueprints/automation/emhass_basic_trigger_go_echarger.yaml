@@ -7,7 +7,7 @@ blueprint:
     You will need one automation based on this blueprint **for each** deferrable load you want to control.
 
     **Core Functions:**
-    * **State Management:** Controls an `input_select` helper to track the load's state (`done`, `wait`, `running`, `force`).
+    * **State Management:** Controls an `input_select` helper to track the load's state (`done`, `wait`, `running`, `surplus`, `force`).
     * **Configuration Output:** Generates the necessary JSON configuration in an `input_text` helper.
     * **Device Control:** Starts and stops your physical device (e.g., `switch`, `input_number`) based on the EMHASS optimization plan.
     * **Flexible Strategies:** Provides multiple strategies to define how a load is started (e.g., by EMHASS) and how it's marked as complete (e.g., by a power sensor).
@@ -18,7 +18,7 @@ blueprint:
     * The go-eCharger API2 integration [marq24/ha-goecharger-api2](https://github.com/marq24/ha-goecharger-api2).
     * For each load, you must create two Home Assistant Helpers:
         1.  An `input_text` helper (max 255 chars) for the JSON data.
-        2.  An `input_select` helper with the options: `done`, `wait`, `running`, `force`, `force-6`, `force-10`, `force-12`, `force-14` and `force-16`.
+        2.  An `input_select` helper with the options: `done`, `wait`, `running`, `surplus`, `force`, `force-6`, `force-10`, `force-12`, `force-14` and `force-16`.
 
     **Setup:**
     After configuring this automation, you **must** add the `input_text` helper you created to the "List of EMHASS Deferrable Loads" input in your main `EMHASS Basic Automation`.
@@ -261,7 +261,7 @@ blueprint:
               max: 1000
               step: 1
               mode: box
-        skip_wait_to_force:
+        skipp_wait_to_force:
           name: Skip 'Wait' and Force 'Running'
           description: >
             When enabled, the automation skips the 'wait' status and goes directly to 'force' ('running') as soon as the 'Wait Sensor' threshold is reached. This starts the load immediately and bypasses EMHASS optimization.
@@ -543,7 +543,7 @@ variables:
   input_notify_done: !input notify_done
   input_wait_sensor: !input wait_sensor
   input_wait_value: !input wait_value
-  input_skip_wait_to_force: !input skip_wait_to_force
+  input_skipp_wait_to_force: !input skipp_wait_to_force
   input_running_stabilize_sensors_delay: !input running_stabilize_sensors_delay
   input_wait_times_hours: !input wait_times_hours
   input_wait_times_minutes: !input wait_times_minutes
@@ -561,6 +561,24 @@ variables:
   input_ho: !input operating_hours
   input_end_timesteps: !input end_timesteps
   input_end_timesteps_force_run: !input end_timesteps_force_run
+  force_states:
+    - force
+    - force-6
+    - force-10
+    - force-12
+    - force-14
+    - force-16
+  surplus_states:
+    - surplus
+  running_states:
+    - running
+    - surplus
+    - force
+    - force-6
+    - force-10
+    - force-12
+    - force-14
+    - force-16
   input_goe_power_number_sensor: !input goe_power_number_sensor
   input_goe_allow_charging_select: !input goe_allow_charging_select
   input_goe_pluged_binary_sensor: !input goe_pluged_binary_sensor
@@ -612,7 +630,7 @@ variables:
       "wait_sensor_name": input_wait_sensor | string,
       "wait_sensor_value": states(input_wait_sensor | string) | default(0) | float,
       "wait_sensor_threshold": input_wait_value | int(0),
-      "skip_wait_to_force_value": input_skip_wait_to_force | default(false) | bool,
+      "skipp_wait_to_force_value": input_skipp_wait_to_force | default(false) | bool,
       "running_stabilize_sensors_delay": input_running_stabilize_sensors_delay | int(0),
       "wait_times_hours_value": input_wait_times_hours | default('0') | string,
       "wait_times_minutes_value": input_wait_times_minutes | default('5') | string,
@@ -658,7 +676,7 @@ variables:
       "goe_battery_entity": states(input_goe_battery_entity | string) | float(0),
       "goe_voltage": 230,
       "goe_minimum_power": 4140,
-      "goe_force_enabled": (states(input_status_sensor | string) | default('done') | string).startswith('force')
+      "goe_force_enabled": (states(input_status_sensor | string) | default('done') | string) in force_states
     } %}
     {% set ns = namespace(count=0, count_done=0, count_open=0, count_open_work=0, power=0, power_done=0, power_done_min=0,
         power_done_max=0, power_open=0, power_open_min=0, power_open_max=0)
@@ -854,7 +872,7 @@ actions:
         {% endif %}
 
         {# 2.3 State-Based Recalculation #}
-        {% if config.emhass_ss > 0 and (config.emhass_us in ['running', 'force'] or (config.emhass_us).startswith('force-')) %}
+        {% if config.emhass_ss > 0 and config.emhass_us in running_states %}
           {% if res.sensor_ho > 0.01 %}
             {% set max_allowed_ho = ([res.et - res.st, 0] | max) * step_hour %}
             {% set target_ho = ((res.sensor_ho * (60/step_min)) | round(0)) / (60/step_min) %}
@@ -864,7 +882,7 @@ actions:
           {% if config.automation_si == true and config.trigger_sensor_value > 0 and config.emhass_deferrable_count > 0 %}
             {% set res.et = config.emhass_deferrable_count_open_work %}
           {% endif %}
-          {% if (config.emhass_us == 'force' or (config.emhass_us).startswith('force-')) and config.emhass_deferrable_count_open_work == 0 %}
+          {% if config.emhass_us in force_states and config.emhass_deferrable_count_open_work == 0 %}
             {% set res.et = (res.ho / step_hour) | int %}
           {% endif %}
         {% endif %}
@@ -904,7 +922,10 @@ actions:
           {% elif config.status_sensor_value == 'running' %}
             {% set res.log_msg = res.log_msg + ['User switched to state running'] %}
             {% set res.automation_action = 'running' %}
-          {% elif config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-')) %}
+          {% elif config.status_sensor_value in surplus_states %}
+            {% set res.log_msg = res.log_msg + ['User switched to state surplus'] %}
+            {% set res.automation_action = 'running' %}
+          {% elif config.status_sensor_value in force_states %}
             {% set res.log_msg = res.log_msg + ['User switched to state force'] %}
             {% set res.automation_action = 'running' %}
           {% elif config.status_sensor_value == 'done' %}
@@ -933,7 +954,7 @@ actions:
             {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1010)'] %}
             {% set res.automation_action = 'wait' %}
           {% elif
-              config.emhass_us in ['running', 'wait'] and
+              config.emhass_us == 'wait' and
               config.emhass_deferrable_power_open > 0 and
               config.trigger_sensor_value == 0 and
               config.automation_si == false and
@@ -943,11 +964,11 @@ actions:
             {% set res.log_msg = res.log_msg + ['Automation switched to state wait (1020)'] %}
             {% set res.automation_action = 'wait' %}
           {% elif
-            (config.emhass_us == 'force' or ((config.emhass_us).startswith('force-'))) and
+            config.emhass_us in force_states and
             config.stop_sensor_value >= config.stop_sensor_threshold and
             config.goe_pluged_binary_sensor_value == true and
             (
-              (config.status_sensor_value in ['wait', 'running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+              config.status_sensor_value in ['wait'] + running_states or
               config.trigger_sensor_value > 0
             )
           %}
@@ -968,8 +989,8 @@ actions:
             {% set res.log_msg = res.log_msg + ['Automation switched to state running by emhass sensor (1110)'] %}
             {% set res.automation_action = 'running' %}
           {% elif
-            (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
-            (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) and
+            config.emhass_us in running_states and
+            config.status_sensor_value in running_states and
             config.wait_sensor_value > config.wait_sensor_threshold and
             config.goe_pluged_binary_sensor_value == true
           %}
@@ -986,8 +1007,8 @@ actions:
             config.stop_sensor_value < config.stop_sensor_threshold and
             config.trigger_strategy_value in ['1', '2', '5', '6'] and
             (
-              (config.emhass_us in ['running', 'force', 'none', 'done'] or ((config.emhass_us).startswith('force-'))) or
-              (config.status_sensor_value in ['running', 'force'] or ((config.status_sensor_value).startswith('force-'))) or
+              config.emhass_us in ['none', 'done'] + running_states or
+              config.status_sensor_value in running_states or
               config.allow_allways_to_done_value == true
             )
           %}
@@ -996,10 +1017,10 @@ actions:
           {% elif
             config.trigger_sensor_value == 0 and
             config.trigger_strategy_value in ['3', '4', '5', '6'] and
-            not (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) and
+            not (config.status_sensor_value in force_states) and
             (
-              (config.emhass_us in ['running', 'none', 'done']) or
-              (config.status_sensor_value in ['running']) or
+              config.emhass_us in ['none', 'done'] + running_states or
+              config.status_sensor_value in running_states or
               config.allow_allways_to_done_value == true
             )
           %}
@@ -1018,7 +1039,7 @@ actions:
         {# --- Override status in force run for go-eCharger --- #}
         {% if
           (config.goe_pluged_binary_sensor_value == true) and
-          (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-'))
+          (config.status_sensor_value in force_states)
         %}
           {% set res.automation_action = 'running' %}
           {% set res.log_msg = res.log_msg + ['Force mode override active (1301)'] %}
@@ -1032,10 +1053,14 @@ actions:
           {% set res.goe_power = 6 %}
 
         {# --- Got to running (force) --- #}
-        {% elif (res.automation_action == 'running' or config.emhass_us == 'running') and (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) %}
+        {% elif (res.automation_action == 'running' or config.emhass_us in ['running'] + surplus_states) and (config.status_sensor_value in force_states) %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status force running'] %}
           {% set res.goe_charging = "0" %}
           {% set res.goe_power = config.status_sensor_value | regex_findall_index('[0-9]+') | default(16, true) | int(16) %}
+        {% elif res.automation_action == 'running' and config.emhass_us in surplus_states and config.goe_pv_surplus_enabled == false and is_user_action == false %}
+          {% set res.log_msg = res.log_msg + ['Goe power pause surplus charging when surplus disabled'] %}
+          {% set res.goe_charging = "1" %}
+          {% set res.goe_power = 6 %}
         {% elif res.automation_action == 'running' %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status normal running'] %}
           {% set res.goe_charging = "0" %}
@@ -1045,7 +1070,7 @@ actions:
         {# --- Got to done --- #}
         {% elif res.automation_action == 'done' %}
           {% set res.log_msg = res.log_msg + ['Goe power switch to status done'] %}
-          {% if config.emhass_us in ['wait', 'running', 'done', 'force'] or (config.emhass_us).startswith('force-') %}
+          {% if config.emhass_us in ['wait', 'done'] + running_states %}
             {% set res.goe_charging = "1" %}
             {% set res.goe_power = 6 %}
           {% endif %}
@@ -1058,7 +1083,7 @@ actions:
         {# --- Got to wait --- #}
         {% if res.automation_action == 'wait' %}
           {% set res.log_msg = res.log_msg + ['Go to status wait'] %}
-          {% set res.new_us = 'wait' if config.skip_wait_to_force_value == false else 'force' %}
+          {% set res.new_us = 'wait' if config.skipp_wait_to_force_value == false else 'force' %}
           {% set res.target_status = res.new_us %}
           {% set res.notify_enabled = config.notify_wait_message is not none and config.notify_wait_message != '' %}
           {% set res.notify_message = config.notify_wait_message %}
@@ -1066,24 +1091,25 @@ actions:
 
         {# --- Got to running (force) --- #}
         {% elif res.automation_action == 'running' %}
+          {% set pause_interruptible_switch = (config.emhass_si == false and config.trigger_sensor_value == 0 and config.emhass_deferrable_power_open > 0 and config.trigger_strategy_value in ['3', '4', '5', '6'] and not (config.status_sensor_value in force_states) and not (config.emhass_us in force_states)) %}
           {% set res.log_msg = res.log_msg + ['Go to status running'] %}
           {% set res.new_running_sensors_delay = config.running_stabilize_sensors_delay %}
           {% if
-              (config.emhass_us in ['running', 'force'] or ((config.emhass_us).startswith('force-'))) and
+              (config.emhass_us in running_states) and
               (
                 config.emhass_us == config.status_sensor_value or
-                config.emhass_si == true
+                (config.emhass_si == true and not (config.status_sensor_value in force_states))
               )
           %}
             {% set res.log_msg = res.log_msg + ['The status is already in a running state: ' + config.emhass_us] %}
             {% set res.new_us = config.emhass_us %}
             {% set res.target_status = res.new_us %}
-            {% set res.sensor_value_switch = 'on' %}
+            {% set res.sensor_value_switch = 'off' if pause_interruptible_switch else 'on' %}
           {% else %}
             {% set res.notify_enabled = config.notify_running_message is not none and config.notify_running_message != '' %}
             {% set res.notify_message = config.notify_running_message %}
             {% set res.new_ss = (as_timestamp(config.current_time) | int) if (is_user_action == true or config.emhass_ss == 0) else config.emhass_ss %}
-            {% if (config.status_sensor_value == 'force' or ((config.status_sensor_value).startswith('force-'))) %}
+            {% if config.status_sensor_value in force_states %}
               {% set res.log_msg = res.log_msg + ['Set force running options'] %}
               {% set res.new_po = (res.goe_power * (config.goe_voltage * 3)) | default(11000) | int %}
               {% set res.new_us = config.status_sensor_value %}
@@ -1093,6 +1119,14 @@ actions:
               {% set res.new_st = 0 %}
               {% set res.new_ho = config.automation_ho + ((config.automation_et_force * config.emhass_step_value) / 60) %}
               {% set res.new_et = (res.new_ho / config.emhass_step_value_hour) | round(0, 'ceil') | int %}
+            {% elif is_user_action == true and config.status_sensor_value in surplus_states %}
+              {% set res.log_msg = res.log_msg + ['Set surplus running options'] %}
+              {% set res.new_us = config.status_sensor_value %}
+              {% set res.target_status = res.new_us %}
+            {% elif config.emhass_us in running_states and is_user_action == false %}
+              {% set res.log_msg = res.log_msg + ['Keep existing running state: ' + config.emhass_us] %}
+              {% set res.new_us = config.emhass_us %}
+              {% set res.target_status = res.new_us %}
             {% else %}
               {% set res.log_msg = res.log_msg + ['Set running options'] %}
               {% set res.new_us = 'running' %}
@@ -1105,7 +1139,7 @@ actions:
             {% if config.update_sensor_type in ['number', 'input_number'] %}
               {% set res.sensor_value_number = config.wait_sensor_value %}
             {% else %}
-              {% set res.sensor_value_switch = 'on' %}
+              {% set res.sensor_value_switch = 'off' if pause_interruptible_switch else 'on' %}
             {% endif %}
           {% endif %}
 
@@ -1141,24 +1175,46 @@ actions:
         {% if
           (config.goe_pv_surplus_enabled == true) and
           (config.goe_pluged_binary_sensor_value == true) and
-          (res.new_us in ['wait', 'running']) and
-          (config.trigger_sensor_value == 0) and
-          not (config.status_sensor_value == 'force' or (config.status_sensor_value).startswith('force-')) and
-          not (res.new_us == 'force' or (res.new_us).startswith('force-'))
+          (config.emhass_us in ['done', 'wait'] + surplus_states) and
+          (res.new_us in ['wait', 'running'] + surplus_states) and
+          (config.trigger_sensor_value == 0 or config.emhass_us in surplus_states) and
+          not (config.status_sensor_value in force_states) and
+          not (res.new_us in force_states)
         %}
-          {% set res.log_msg = res.log_msg + ['Overwrite settings for status running in surplus mode ' + res.automation_action + ' - ' + res.new_us] %}
+          {% set res.log_msg = res.log_msg + ['Overwrite settings for status surplus in surplus mode ' + res.automation_action + ' - ' + res.new_us] %}
           {% set res.goe_power = 16 %}
           {% set res.goe_charging = "0" %}
-          {% set res.goe_logic_mode = "4"  %}
+          {% set res.goe_logic_mode = "4" %}
           {% set res.goe_load_phase = "0" %}
           {% set res.goe_surplus = true %}
-          {% set res.new_us = "running" %}
+          {% set res.new_us = "surplus" %}
           {% set res.target_status = res.new_us %}
+        {% endif %}
+
+        {# --- State Transition Guard (enforce allowed automatic transitions) --- #}
+        {% if is_user_action == false and res.new_us != 'none' %}
+          {% set allowed_targets = ['done', config.emhass_us] %}
+          {% if config.emhass_us == 'done' %}
+            {% set allowed_targets = allowed_targets + ['wait'] + surplus_states + (['force'] if config.skipp_wait_to_force_value == true else []) %}
+          {% elif config.emhass_us == 'wait' %}
+            {% set allowed_targets = allowed_targets + ['running'] + surplus_states + force_states %}
+          {% elif config.emhass_us == 'running' %}
+            {% set allowed_targets = allowed_targets + force_states %}
+          {% elif config.emhass_us in surplus_states %}
+            {% set allowed_targets = allowed_targets + force_states %}
+          {% elif config.emhass_us in force_states %}
+            {% set allowed_targets = allowed_targets + force_states %}
+          {% endif %}
+          {% if not (res.new_us in allowed_targets) %}
+            {% set res.log_msg = res.log_msg + ['Transition from ' + config.emhass_us + ' to ' + res.new_us + ' is not allowed. Keeping ' + config.emhass_us + ' (1320)'] %}
+            {% set res.new_us = config.emhass_us %}
+            {% set res.target_status = res.new_us %}
+          {% endif %}
         {% endif %}
 
         {# --- Create a new target JSON and ensure that our JSON is not modified if a plan has already been created --- #}
         {# --- A new calculation can only be generated via the status 'done' -> 'wait' or by a user action --- #}
-        {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us in ['done', 'wait', 'running', 'force']) or (res.new_us).startswith('force-') or (config.emhass_deferrable_power_open == 0) %}
+        {% set json_override_allowed = (is_user_action == true) or (res.new_ss > 0 and config.emhass_ss == 0) or (res.new_us in ['done', 'wait'] + running_states) or (config.emhass_deferrable_power_open == 0) %}
         {% set result_target_json = {
             'po': res.new_po if json_override_allowed else config.emhass_po,
             'ho': res.new_ho if json_override_allowed else config.emhass_ho,
@@ -1468,7 +1524,7 @@ actions:
         value_template: >
           {% set config = context | from_json %}
           {% set target_st = config.result.target_status | default('done') | string %}
-          {{ (config.result.goe.pluged | default(false) | bool) and (target_st in ['running', 'force'] or target_st.startswith('force-')) }}
+          {{ (config.result.goe.pluged | default(false) | bool) and (target_st in running_states) }}
     then:
       - repeat:
           while:
@@ -1476,7 +1532,7 @@ actions:
               value_template: >
                 {% set pluged = is_state(input_goe_pluged_binary_sensor, 'on') %}
                 {% set st = states(input_status_sensor) | default('done') %}
-                {{ pluged and (st in ['running', 'force'] or st.startswith('force-')) }}
+                {{ pluged and (st in running_states) }}
           sequence:
             - variables:
                 cur_status: "{{ states(input_status_sensor) | default('done') }}"
@@ -1489,7 +1545,7 @@ actions:
                 pakku_val: "{{ states(input_goe_battery_entity) | float(0) }}"
             - if:
                 - condition: template
-                  value_template: "{{ cur_status == 'running' and stop_val < stop_thresh }}"
+                  value_template: "{{ cur_status in ['running'] + surplus_states and stop_val < stop_thresh }}"
               then:
                 - action: select.select_option
                   data:
@@ -1516,7 +1572,7 @@ actions:
                     # --- Branch 1: Force mode (charge car to 100% at specified or default 16A) ---
                     - conditions:
                         - condition: template
-                          value_template: "{{ cur_status == 'force' or cur_status.startswith('force-') }}"
+                          value_template: "{{ cur_status in force_states }}"
                       sequence:
                         - variables:
                             force_amp: >
@@ -1607,7 +1663,7 @@ actions:
                     # --- Branch 3: Surplus Eco Mode (emhass_p == 0 and surplus enabled) ---
                     - conditions:
                         - condition: template
-                          value_template: "{{ cur_status == 'running' and emhass_p == 0 and surplus_ok }}"
+                          value_template: "{{ cur_status in surplus_states and emhass_p == 0 and surplus_ok }}"
                       sequence:
                         - if:
                             - condition: template
@@ -1652,7 +1708,7 @@ actions:
                     # --- Branch 4: Neither EMHASS Power nor Surplus (Pause or Done) ---
                     - conditions:
                         - condition: template
-                          value_template: "{{ cur_status == 'running' and emhass_p == 0 and not surplus_ok }}"
+                          value_template: "{{ cur_status in ['running'] + surplus_states and emhass_p == 0 and not surplus_ok }}"
                       sequence:
                         - if:
                             - condition: template

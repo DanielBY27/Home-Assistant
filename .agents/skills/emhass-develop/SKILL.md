@@ -47,7 +47,7 @@ flowchart TD
   "si": true,     // Single constant power block (bool)
   "mp": 4200,     // Minimum power in Watts (W)
   "pe": 2,        // Startup penalty score
-  "us": "wait",   // Automation status (done, wait, running, force)
+  "us": "wait",   // Automation status (done, wait, running, surplus, force)
   "ss": 0         // Actual planned start timestamp (0 = no plan yet)
 }
 ```
@@ -80,15 +80,25 @@ The go-eCharger controller (`examples/blueprints/emhass_basic_trigger_go_echarge
   - **Deficit Situation (e.g. 40.5 kWh needed vs 14.5 kWh forecast):**
     Surplus mode evaluates to `false`. Status stays `wait`. EMHASS optimizes charging during cheap night hours via `p_deferrable4`.
 
-### Priority & Active Charging Control Loop:
-- **Plan Latching & Surplus Override Protection**:
-  When EMHASS has scheduled power (`sensor.p_deferrable4 > 0`) or when `force` / `force-X` is selected, surplus mode is prevented from overriding the running plan. Surplus mode only takes effect when EMHASS has no scheduled power (`trigger_sensor_value == 0`) and the system is not in force mode.
-- **Active Charging Control Loop**:
-  Runs while the EV is connected and charging (`running` or `force*`):
+### Priority, State Machine & Active Charging Control Loop:
+- **State Grouping Variables (`force_states`, `surplus_states`, `running_states`)**:
+  Both `emhass_basic_trigger.yaml` and `emhass_basic_trigger_go_echarger.yaml` define top-level list variables (`force_states`, `surplus_states`, `running_states`) to keep the blueprints diff-identical across shared state transitions:
+  - `force_states`: `['force', 'force-6', 'force-10', 'force-12', 'force-14', 'force-16']`
+  - `surplus_states`: `['surplus']`
+  - `running_states`: `['running'] + surplus_states + force_states`
+- **Strict State Machine Transition Rules (`1320` State Transition Guard)**:
+  Both trigger blueprints enforce strict automatic state transitions:
+  - **Allowed transitions**: `done -> wait`, `wait -> running`, `running -> force*`, `wait -> surplus`, `surplus -> force*`, `running -> done`, `surplus -> done`, `force* -> done`, `done -> surplus`, and `* -> done`.
+  - **Forbidden automatic transitions**: `running -> surplus`, `surplus -> running`, `running -> wait`, `surplus -> wait`. Once an appliance or EV enters `running` or `surplus`, it stays locked in that state until it finishes (`done`) or is upgraded to `force*`.
+- **Interruptible vs. Non-Interruptible Loads (`emhass_basic_trigger.yaml`)**:
+  - **Non-interruptible (`si: true`, e.g., Dishwasher)**: Stays in `running` with switch `on` until `stop_sensor` drops below threshold (`trigger_strategy: "1"`).
+  - **Interruptible (`si: false`, `trigger_strategy: "5"`, e.g., Water Boiler)**: Stays in `running` across multiple EMHASS blocks while `sum(p_deferrable) > 0`, but dynamically pauses the physical switch (`pause_interruptible_switch` -> `value_switch: "off"`) during intermediate 0 W timesteps and turns it back `on` when `p_deferrable > 0`.
+- **Active Charging Control Loop (`emhass_basic_trigger_go_echarger.yaml`)**:
+  Runs while the EV is connected and charging (`st in running_states`):
   1. **Full Charge Detection:** When `sensor.emhass_go_echarger_trigger < 10` Wh (target SoC reached), stops charging (`frc = 1`), disables surplus (`fup = off`), sets status and JSON to `done`, and exits the loop.
-  2. **Force Mode:** Guarantees charging to 100% full at 16A (or selected `force-X` current). Never interrupted by zero EMHASS power.
-  3. **EMHASS Basic Mode (Mode 3):** When `p_deferrable4 > 0`, modulates current dynamically ($A = \text{clamp}(\lceil P / 690 \rceil, 6, 16)$) and keeps `fup = off`.
-  4. **Surplus Eco Mode (Mode 4):** When `p_deferrable4 == 0` and surplus is enabled, sets Mode 4 at 16A with `fup = on` and continuously streams `set_pv_data` (grid, pv, battery).
+  2. **Force Mode (`st in force_states`):** Guarantees charging to 100% full at 16A (or selected `force-X` current). Never interrupted by zero EMHASS power.
+  3. **EMHASS Basic Mode (Mode 3, `running`):** When `st == 'running'` and `p_deferrable4 > 0`, modulates current ($A = \text{clamp}(\lceil P / 690 \rceil, 6, 16)$) with `frc = 2`, `lmo = 3`, and `fup = off`. If `p_deferrable4 == 0` while `running` (multi-block wait), pauses charging (`frc = 1`) while staying in `running`.
+  4. **Surplus Eco Mode (Mode 4, `surplus`):** When `st in surplus_states`, sets Mode 4 at 16A with `fup = on`, and continuously streams `set_pv_data` (grid, pv, battery). If surplus conditions end (`goe_pv_surplus_enabled == false`), pauses (`frc = 1`, `fup = off`) while staying in `surplus`.
   5. **Disconnection Cleanup:** When the EV is unplugged, automatically sets `frc = 1`, `fup = off`, and marks status `done`.
 
 ### Key Wallbox Sensors:

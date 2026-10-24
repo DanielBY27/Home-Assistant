@@ -1,0 +1,43 @@
+{
+    "_comment": "Water Boiler: done -> wait when battery SoC exceeds wait_value (95%).",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_water_boiler.yaml",
+    "overrides": {
+        "input_select.water_bioler_emhass_status": "done",
+        "input_text.water_bioler_emhass_json": "{\"po\":1500,\"ho\":0,\"st\":0,\"et\":0,\"se\":false,\"si\":false,\"mp\":100,\"pe\":10,\"us\":\"done\",\"ss\":0,\"needs_optim\":false}",
+        "sensor.p_deferrable3": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "sensor.scb_battery_soc": "98",
+        "switch.heisswasser_switch": "off"
+    },
+    "trigger": {
+        "id": "wait_sensor_value_above",
+        "entity_id": "sensor.scb_battery_soc"
+    },
+    "now": "2026-03-28T08:00:00+01:00",
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "wait",
+            "sensor": {
+                "type": "switch",
+                "name": "switch.heisswasser_switch",
+                "value_switch": "off"
+            },
+            "target_json": {
+                "us": "wait",
+                "po": 1500,
+                "ho": 6.0,
+                "st": 0,
+                "et": 48,
+                "se": false,
+                "si": false,
+                "needs_optim": true
+            }
+        }
+    }
+}

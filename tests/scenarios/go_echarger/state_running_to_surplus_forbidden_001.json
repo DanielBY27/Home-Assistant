@@ -1,0 +1,45 @@
+{
+    "_comment": "Forbidden transition check: running -> surplus must NOT happen automatically when PV surplus is enabled and EMHASS power is 0; stays in running.",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_go_echarger_blueprint.yaml",
+    "overrides": {
+        "input_select.wallbox_emhass_status": "running",
+        "goe_pv_surplus_enabled": "true",
+        "input_text.wallbox_emhass_json": "{\"po\":11000,\"ho\":1.5,\"st\":0,\"et\":12,\"se\":true,\"si\":false,\"mp\":4140,\"pe\":0,\"us\":\"running\",\"ss\":1773480600,\"needs_optim\":false}",
+        "sensor.p_deferrable4": {
+            "state": "0",
+            "attributes": {
+                "deferrables_schedule": []
+            }
+        },
+        "sensor.emhass_go_echarger_trigger": "5000",
+        "binary_sensor.goe_297534_car_0": "on",
+        "select.goe_297534_frc": "0",
+        "number.goe_297534_amp": "6",
+        "select.goe_297534_lmo": "3",
+        "select.goe_297534_psm": "0",
+        "switch.goe_297534_fup": false
+    },
+    "trigger": {
+        "id": "cron",
+        "platform": "time_pattern"
+    },
+    "expected": {
+        "context": {
+            "target_status": "running",
+            "target_json": {
+                "us": "running",
+                "needs_optim": false
+            },
+            "goe": {
+                "charging": "0",
+                "power": 6,
+                "pluged": true,
+                "surplus_enabled_config": true,
+                "surplus_enabled": false,
+                "load_phase": "0",
+                "logic_mode": "3"
+            }
+        }
+    }
+}

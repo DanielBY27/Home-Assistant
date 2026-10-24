@@ -51,7 +51,7 @@ graph TD
 - **Centralized Configuration**: Manage all EMHASS parameters from a single automation in the HA UI.
 - **Dynamic Deferrable Loads**: Easily add or remove deferrable loads by simply adding their input_text helper.
 - **Automated Control**: Manages all EMHASS timers for saving configs, running optimizations, publishing data, and training ML models.
-- **Clear State Management**: The Deferrable Load Controller provides robust, strategy-based logic to manage the state (wait, running, done) of your devices.
+- **Clear State Management**: The Deferrable Load Controller provides robust, strategy-based logic to manage the state (`wait`, `running`, `surplus`, `force`, `done`) of your devices.
 
 ## Support
 Please understand that I can only provide support for my own blueprints and their functionality. I cannot provide general support for the **Energy Management Optimization for Home Assistant (EMHASS)** add-on itself.
@@ -122,6 +122,7 @@ These will be used for your first deferrable load, but they are required to save
         - `wait`
         - `running`
         - `force`
+        - `surplus` *(plus `force-6`..`force-16` for the go-eCharger Wallbox controller)*
     - Ensure the initial state is set to `done`.
 
 ### Step 3: Install the 'EMHASS Basic Automation Controller'

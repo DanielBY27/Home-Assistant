@@ -1,0 +1,52 @@
+{
+    "_comment": "Water Boiler: wait -> running when EMHASS schedules load > 0; turns switch.heisswasser_switch ON.",
+    "base_mock": "tests/mocks/emhass_basic_trigger_mock.json",
+    "example_inputs": "examples/blueprints/emhass_basic_trigger_water_boiler.yaml",
+    "overrides": {
+        "input_select.water_bioler_emhass_status": "wait",
+        "input_text.water_bioler_emhass_json": "{\"po\":1500,\"ho\":6.0,\"st\":0,\"et\":48,\"se\":false,\"si\":false,\"mp\":100,\"pe\":10,\"us\":\"wait\",\"ss\":1774680000,\"needs_optim\":false}",
+        "sensor.p_deferrable3": {
+            "state": "1500",
+            "attributes": {
+                "deferrables_schedule": [
+                    {
+                        "p_deferrable3": 1500,
+                        "date": "2026-03-28T08:00:00+01:00"
+                    },
+                    {
+                        "p_deferrable3": 0,
+                        "date": "2026-03-28T08:15:00+01:00"
+                    },
+                    {
+                        "p_deferrable3": 1500,
+                        "date": "2026-03-28T08:30:00+01:00"
+                    }
+                ]
+            }
+        },
+        "sensor.scb_battery_soc": "98",
+        "switch.heisswasser_switch": "off"
+    },
+    "trigger": {
+        "id": "input_sensor_value_above",
+        "entity_id": "sensor.p_deferrable3"
+    },
+    "now": "2026-03-28T08:00:00+01:00",
+    "expected": {
+        "context": {
+            "action_needed": true,
+            "target_status": "running",
+            "sensor": {
+                "type": "switch",
+                "name": "switch.heisswasser_switch",
+                "value_switch": "on"
+            },
+            "target_json": {
+                "us": "running",
+                "se": false,
+                "si": false,
+                "needs_optim": false
+            }
+        }
+    }
+}

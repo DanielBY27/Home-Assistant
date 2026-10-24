@@ -99,3 +99,48 @@ def test_multi_load_aggregation():
     # The Dishwasher signaled needs_optim=True
     assert context_json["result"]["action_needed"] == True
     assert "optim" in context_json["result"]
+
+
+def test_multi_load_surplus_compatibility():
+    """
+    Integration test checking that emhass_basic.yaml is 100% compatible
+    with the 'surplus' state in input_text.wallbox_emhass_json and input_select.wallbox_emhass_status.
+    """
+    with open('tests/mocks/emhass_basic_mock.json', 'r') as f:
+        mock_data = json.load(f)
+
+    example_inputs = load_example_inputs('examples/blueprints/emhass_basic_blueprint.yaml')
+    mock_data["inputs"].update(example_inputs)
+
+    wb_json = {
+        "po": 11000,
+        "ho": 4.25,
+        "st": 0,
+        "et": 76,
+        "se": False,
+        "si": False,
+        "mp": 4200,
+        "pe": 2,
+        "us": "surplus",
+        "ss": 1762078083,
+        "needs_optim": True
+    }
+
+    mock_data["states"]["input_text.wallbox_emhass_json"] = {
+        "state": json.dumps(wb_json),
+        "attributes": {"friendly_name": "Wallbox"}
+    }
+    mock_data["states"]["input_select.wallbox_emhass_status"] = "surplus"
+
+    variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic.yaml', mock_data)
+    snapshot_json = json.loads(variables["snapshot"]) if isinstance(variables["snapshot"], str) else variables["snapshot"]
+    context_json = json.loads(variables["context"]) if isinstance(variables["context"], str) else variables["context"]
+    optim_payload = context_json["result"]["optim"]
+
+    assert snapshot_json["emhass_trigger_us"][4] == "surplus"
+    assert optim_payload["nominal_power_of_deferrable_loads"][4] == 11000
+    assert optim_payload["operating_hours_of_each_deferrable_load"][4] == 4.25
+    assert optim_payload["start_timesteps_of_each_deferrable_load"][4] == 0
+    assert optim_payload["end_timesteps_of_each_deferrable_load"][4] == 76
+    assert optim_payload["minimum_power_of_deferrable_loads"][4] == 4200
+    assert context_json["automation"]["optim_enabled"] is True

@@ -26,9 +26,9 @@
     "expected": {
         "context": {
             "action_needed": true,
-            "target_status": "running",
+            "target_status": "surplus",
             "target_json": {
-                "us": "running",
+                "us": "surplus",
                 "ho": 0.25,
                 "st": 0,
                 "ss": 1773478800,

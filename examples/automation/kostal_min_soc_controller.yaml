@@ -110,6 +110,7 @@ actions:
             entity_id: input_select.wallbox_emhass_status
             state:
               - running
+              - surplus
               - force
               - force-6
               - force-10
