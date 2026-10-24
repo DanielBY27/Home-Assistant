@@ -208,6 +208,8 @@ class HomeAssistantMockEnv:
             return None
         if isinstance(value, datetime.datetime):
             return value
+        if isinstance(value, (int, float)):
+            return datetime.datetime.fromtimestamp(float(value), tz=datetime.timezone.utc)
         if not value or str(value).strip() == "":
             return None
         try:
@@ -226,7 +228,11 @@ class HomeAssistantMockEnv:
     def filter_as_local(self, value):
         if value is None or isinstance(value, datetime.datetime) is False:
             return value
-        return value # Mocking as local (could add TZ logic if needed)
+        from zoneinfo import ZoneInfo
+        local_tz = ZoneInfo("Europe/Berlin")
+        if value.tzinfo is None:
+            return value.replace(tzinfo=local_tz)
+        return value.astimezone(local_tz)
 
     def filter_as_timestamp(self, value):
         if value is None or isinstance(value, jinja2.Undefined):

@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir \
     pytest \
     jinja2 \
     pyyaml \
+    tzdata \
     google-api-python-client \
     google-auth \
     google-auth-oauthlib \

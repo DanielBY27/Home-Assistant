@@ -136,3 +136,37 @@ def test_emhass_basic_soc_final_calculation(now_iso, battery_soc, expected_soc_f
     assert float(optim_payload["soc_final"]) == pytest.approx(expected_soc_final, 0.001)
 
 
+@pytest.mark.parametrize("now_iso, expected_steps, expected_num_lags", [
+    ("2026-10-23T10:00:00+02:00", 96, 100),   # Standard 24h day (96 steps, 100 lags)
+    ("2026-10-24T01:45:00+02:00", 96, 100),   # Before DST transition window (ends 2026-10-25 01:45+02:00 -> 96 steps)
+    ("2026-10-24T04:00:00+02:00", 100, 100),  # DST fall-back horizon (25h day -> 100 steps, 100 lags)
+    ("2026-10-24T10:00:00+02:00", 100, 100),  # DST fall-back horizon (25h day -> 100 steps, 100 lags)
+    ("2026-03-28T10:00:00+01:00", 92, 100),   # DST spring-forward horizon (23h day -> 92 steps, 100 lags)
+])
+def test_emhass_basic_dst_horizon_and_lags(now_iso, expected_steps, expected_num_lags):
+    """
+    Verifies that emhass_basic dynamically calculates forecast list lengths (92, 96, or 100)
+    across Daylight Saving Time transitions and sets num_lags to 100 (25h safe buffer).
+    """
+    mock_data = setup_basic_mock()
+    mock_data["now"] = now_iso
+    variables = load_blueprint_and_render_variables('blueprints/automation/emhass_basic.yaml', mock_data)
+    context_raw = variables["context"]
+    context_json = json.loads(context_raw) if isinstance(context_raw, str) else context_raw
+
+    optim_payload = context_json["result"]["optim"]
+    forecast_payload = context_json["result"]["forecast"]
+
+    load_cost_list = optim_payload["load_cost_forecast"]
+    if isinstance(load_cost_list, str):
+        load_cost_list = json.loads(load_cost_list)
+    pv_forecast_list = optim_payload["p_pv_forecast"]
+    if isinstance(pv_forecast_list, str):
+        pv_forecast_list = json.loads(pv_forecast_list)
+
+    assert len(load_cost_list) == expected_steps
+    assert len(pv_forecast_list) == expected_steps
+    assert forecast_payload["num_lags"] == expected_num_lags
+
+
+

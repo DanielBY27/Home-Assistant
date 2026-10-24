@@ -10,7 +10,7 @@ use_blueprint:
       {% set tibber_avg = state_attr('sensor.tibber27a_strompreis', 'avg_price')
       | default(0.35) | float(0.35) %}
 
-      {% set tibber_avg_list = [tibber_avg] * 96 %}
+      {% set tibber_avg_list = [tibber_avg] * 100 %}
 
       {% set now = now() %}
 
@@ -22,9 +22,9 @@ use_blueprint:
           {% endif %}
         {% endfor %}
         {% set combined_forecast = ns.data + tibber_avg_list %}
-        {{ combined_forecast[:96] }}
+        {{ combined_forecast[:100] }}
       {% else %}
-        {{ ([tibber_avg] * 96) }}
+        {{ ([tibber_avg] * 100) }}
       {% endif %}
     emhass_config_p_pv_forecast: >-
       {% set today = state_attr('sensor.solcast_pv_forecast_prognose_heute',
@@ -45,9 +45,9 @@ use_blueprint:
             {% set future_forecast_watts.data = future_forecast_watts.data + [pv_power_w, pv_power_w] %}
           {% endif %}
         {% endfor %}
-        {{ future_forecast_watts.data[:96] }}
+        {{ future_forecast_watts.data[:100] }}
       {% else %}
-        {{ ([0] * 96) }}
+        {{ ([0] * 100) }}
       {% endif %}
     emhass_config_soc_init: '{{ (states(''sensor.scb_battery_soc'') | float(10) / 100) | round(2) }}'
     emhass_config_soc_final: >-

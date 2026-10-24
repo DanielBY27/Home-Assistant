@@ -478,7 +478,7 @@ blueprint:
             JSON definition to overwrite the mlforecaster api (forecast-model-fit) payload. Default Payload:
             ```
             {% set step = (emhass_config_optimization_time_step | int(30)) %}
-            {% set num_lags = (1440 / step) | int %}
+            {% set num_lags = ((1440 * (emhass_config_delta_forecast_daily | default(1) | int(1)) + 60) / step) | int %}
             {% set is_monday = (now().isoweekday() == 1) %}
             {
               "historic_days_to_retrieve": historic_days_to_retrieve,
@@ -1074,15 +1074,32 @@ variables:
   emhass_config_load_peak_hour_periods: !input emhass_config_load_peak_hour_periods
   emhass_config_load_peak_hours_cost: !input emhass_config_load_peak_hours_cost
   emhass_config_load_cost_forecast_raw: !input emhass_config_load_cost_forecast
+  emhass_config_horizon_steps: >
+    {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
+    {% set delta_days = emhass_config_delta_forecast_daily | int(1) %}
+    {% set dt = now() | as_datetime | as_local %}
+    {% set start_dt = dt.replace(minute=(dt.minute // step_minutes) * step_minutes, second=0, microsecond=0) %}
+    {% set next_day_naive = (start_dt.replace(tzinfo=none) + timedelta(days=delta_days)) | string %}
+    {% set end_dt_raw = (next_day_naive | as_datetime | as_local).replace(fold=1) %}
+    {% set end_dt_utc = end_dt_raw | as_timestamp | as_datetime | as_local %}
+    {% if end_dt_utc.hour != end_dt_raw.hour %}
+      {% set end_dt = (end_dt_raw | as_timestamp + 3600) | as_datetime | as_local %}
+    {% else %}
+      {% set end_dt = end_dt_raw %}
+    {% endif %}
+    {{ ((end_dt | as_timestamp - start_dt | as_timestamp) / (step_minutes * 60)) | round(0) | int((1440 * delta_days / step_minutes) | int(48)) }}
   emhass_config_load_cost_forecast_calc: >
     {% set raw_value = emhass_config_load_cost_forecast_raw | string | trim %}
     {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
-    {% set count = (1440 / step_minutes) | int(48) %}
+    {% set count = emhass_config_horizon_steps | int((1440 / step_minutes) | int(48)) %}
     {% set potential_list = raw_value | from_json(default=None) %}
     {% if '{{' in raw_value and '}}' in raw_value %}
       {{ raw_value }}
-    {% elif potential_list is iterable and potential_list is not string and potential_list | length == count %}
-      {{ raw_value }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list is not mapping and potential_list | length >= count %}
+      {{ (potential_list | list)[:count] | to_json }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list is not mapping and potential_list | length > 0 %}
+      {% set lst = potential_list | list %}
+      {{ (lst + [lst[-1]] * (count - (lst | length)))[:count] | to_json }}
     {% else %}
       {% set single_value = raw_value | float(0) | round(2) %}
       {{ [single_value] * count }}
@@ -1095,12 +1112,15 @@ variables:
   emhass_config_p_pv_forecast_calc: >
     {% set raw_value = emhass_config_p_pv_forecast_raw | string | trim %}
     {% set step_minutes = emhass_config_optimization_time_step | int(30) %}
-    {% set count = (1440 / step_minutes) | int(48) %}
+    {% set count = emhass_config_horizon_steps | int((1440 / step_minutes) | int(48)) %}
     {% set potential_list = raw_value | from_json(default=None) %}
     {% if '{{' in raw_value and '}}' in raw_value %}
       {{ raw_value }}
-    {% elif potential_list is iterable and potential_list is not string and potential_list | length == count %}
-      {{ raw_value }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list is not mapping and potential_list | length >= count %}
+      {{ (potential_list | list)[:count] | to_json }}
+    {% elif potential_list is iterable and potential_list is not string and potential_list is not mapping and potential_list | length > 0 %}
+      {% set lst = potential_list | list %}
+      {{ (lst + [0] * (count - (lst | length)))[:count] | to_json }}
     {% else %}
       {% set single_value = raw_value | float(0) | round(1) %}
       {{ [single_value] * count }}
@@ -1147,12 +1167,12 @@ variables:
       'emhass_current_time_delta': (now_dt - timedelta(minutes=step_minutes)) | as_datetime | as_local | string,
       'emhass_current_time_delta_publish': (now_dt - timedelta(minutes=(emhass_publish_minutes_timer_int | int + 1 | default(6) | int))) | as_datetime | as_local | string,
       'emhass_historic_days_to_retrieve': emhass_config_historic_days_to_retrieve | default(9) | int,
-      'emhass_num_lags': (1440 / step_minutes) | int,
+      'emhass_num_lags': ((1440 * (emhass_config_delta_forecast_daily | default(1) | int(1)) + 60) / step_minutes) | int,
       'emhass_ml_forecast_json_default': {
         'historic_days_to_retrieve': emhass_config_historic_days_to_retrieve | default(9) | int,
         'var_model': emhass_config_sensor_power_load_no_var_loads | string,
         'sklearn_model': 'KNeighborsRegressor',
-        'num_lags': (1440 / step_minutes) | int,
+        'num_lags': ((1440 * (emhass_config_delta_forecast_daily | default(1) | int(1)) + 60) / step_minutes) | int,
         'split_date_delta': '48h',
         'perform_backtest': ((now_dt | as_datetime | as_local).isoweekday() == 1) | bool
       },

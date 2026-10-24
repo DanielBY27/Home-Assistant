@@ -17,6 +17,10 @@ This skill documents the complete EMHASS setup, blueprint architectures, deferra
   - Feed-in Tariff (`production_price`): `0.082` €/kWh (fixed German EEG feed-in remuneration).
   - Dynamic Import Tariff: Tibber electricity price (`sensor.tibber_electricity_price`).
   - Solcast Solar Forecast: Real-time 48h irradiance forecast passed to EMHASS via `sensor.solcast_pv_forecast_prognose_aktuelle_stunde` and future timesteps.
+  - **Dynamic DST Horizon & ML Forecaster Lags (`emhass_basic.yaml`)**:
+    - Because EMHASS calculates its optimization horizon in calendar days (`pd.date_range(start, end=start + DateOffset(days=1))`), the 24h window contains `96` steps on normal days, `100` steps (25 hours) on autumn Daylight Saving Time (DST) fall-back transitions, and `92` steps (23 hours) on spring DST transitions.
+    - The blueprint dynamically computes `emhass_config_horizon_steps` (matching EMHASS `utils.get_forecast_dates`) and automatically slices or pads `load_cost_forecast` and `p_pv_forecast` (which are generated with up to `100` steps in the input templates) to the exact required length (`92`, `96`, or `100`).
+    - For `mlforecaster`, `num_lags` is set to `((1440 * delta_days + 60) / step_minutes) | int` (`100` for 15-minute steps) so `forecast-model-fit` always trains enough lag features to cover a 25-hour fall-back day without throwing `IndexError: list index out of range`.
 
 ---
 
