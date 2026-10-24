@@ -119,6 +119,41 @@ def get_pivot_damp_factors(month_number: Optional[int] = None) -> Dict[str, Any]
     target_month_name = GERMAN_MONTHS.get(month_number, "Oktober")
     _, sheets = get_services()
 
+    # Ensure target_month_name is expanded (not collapsed) in Pivot-Tabelle 1
+    meta = (
+        sheets.spreadsheets()
+        .get(
+            spreadsheetId=SPREADSHEET_ID,
+            ranges=["'Pivot-Tabelle 1'!A1:B20"],
+            includeGridData=True,
+        )
+        .execute()
+    )
+    for s in meta.get("sheets", []):
+        if s.get("properties", {}).get("title") == "Pivot-Tabelle 1":
+            sheet_id = s["properties"]["sheetId"]
+            grid = s.get("data", [{}])[0].get("rowData", [])
+            if grid and grid[0].get("values") and "pivotTable" in grid[0]["values"][0]:
+                pt = grid[0]["values"][0]["pivotTable"]
+                needs_update = False
+                for vm in pt.get("rows", [{}])[0].get("valueMetadata", []):
+                    val = vm.get("value", {}).get("stringValue", "")
+                    should_collapse = not val.lower().startswith(target_month_name.lower())
+                    if vm.get("collapsed") != should_collapse:
+                        vm["collapsed"] = should_collapse
+                        needs_update = True
+                if needs_update:
+                    req = {
+                        "updateCells": {
+                            "rows": [{"values": [{"pivotTable": pt}]}],
+                            "start": {"sheetId": sheet_id, "rowIndex": 0, "columnIndex": 0},
+                            "fields": "pivotTable",
+                        }
+                    }
+                    sheets.spreadsheets().batchUpdate(
+                        spreadsheetId=SPREADSHEET_ID, body={"requests": [req]}
+                    ).execute()
+
     pivot_data = (
         sheets.spreadsheets()
         .values()
