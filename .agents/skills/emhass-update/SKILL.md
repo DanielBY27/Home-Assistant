@@ -127,6 +127,7 @@ Suppress failure notifications before the update:
    Verify solver status is `Optimal` and entities posted successfully.
 
 ### 12. Error Diagnostics & Remediation (If Needed)
+- **Dry-Run API (EMHASS ≥v0.18.7):** `POST /api/v1/dry-run/<action>` (e.g., `/api/v1/dry-run/dayahead-optim`) solves and returns the plan directly in the HTTP response without writing any files or updating Home Assistant entities (`feat: dry run: POST /api/v1/dry-run/<action> solves and returns the plan, writing nothing`). Ideal for isolated root-cause analysis and testing runtime payloads without side effects.
 - View container logs directly: `ssh homeassistant "docker logs addon_5b918bf2_emhass --tail 100"`
 - Check stored JSON: `ssh homeassistant "cat /share/config.json"`
 - Rollback if critical failure cannot be solved:

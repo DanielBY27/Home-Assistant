@@ -12,6 +12,9 @@ This skill documents the complete EMHASS setup, blueprint architectures, deferra
 ## 1. EMHASS Core Architecture & Optimization Config
 
 - **Add-on Service:** Docker container managed by Supervisor (`slug: 5b918bf2_emhass`, REST port 5000).
+- **Diagnostic & Dry-Run API Endpoints (EMHASS ≥v0.18.7):**
+  - `POST /api/v1/dry-run/<action>` (e.g., `/api/v1/dry-run/dayahead-optim`): Solves and returns the optimization plan directly without writing any files or updating Home Assistant entities (`feat: dry run: POST /api/v1/dry-run/<action> solves and returns the plan, writing nothing`). Useful for troubleshooting, reproducing infeasibility, or testing runtime payloads without side effects.
+  - `GET /api/v1/plan` & `GET /api/v1/last-run`: Structured JSON inspection of the latest optimization run.
 - **Optimization Strategy:**
   - `costfun`: Set to `cost` (minimizes total monetary cost).
   - Feed-in Tariff (`production_price`): `0.082` €/kWh (fixed German EEG feed-in remuneration).
