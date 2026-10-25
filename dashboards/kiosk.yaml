@@ -1,6 +1,10 @@
 kiosk_mode:
   hide_header: true
   hide_sidebar: true
+  mobile_settings:
+    hide_header: false
+    hide_sidebar: false
+    custom_width: 600
 
 button_card_templates:
   nav_base:
@@ -52,11 +56,11 @@ button_card_templates:
                 : 'var(--secondary-text-color)';
             ]]]
     extra_styles: |
-      @media (max-width: 768px) {
+      @media (max-width: 480px) {
         #card {
           width: 64px !important;
           height: 52px !important;
-          margin: 0 !important;
+          margin: 0 auto !important;
         }
         #icon {
           width: 18px !important;
@@ -128,11 +132,11 @@ button_card_templates:
         top: 6px;
         right: 6px;
       }
-      @media (max-width: 768px) {
+      @media (max-width: 480px) {
         #card {
           width: 64px !important;
           height: 52px !important;
-          margin: 0 !important;
+          margin: 0 auto !important;
         }
         #entity_picture {
           width: 24px !important;
@@ -185,7 +189,6 @@ button_card_templates:
       navigation_path: '[[[ return "/dashboard-kiosk/" + variables.path ]]]'
 
   camera_card:
-    aspect_ratio: 16/9
     show_entity_picture: false
     show_icon: false
     show_name: true
@@ -195,12 +198,19 @@ button_card_templates:
         - overflow: hidden
         - background: '#0b0e14'
         - padding: 0px !important
+        - margin: 0px !important
+        - width: 100%
+        - height: 225px
+        - box-sizing: border-box
         - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.2))
         - cursor: pointer
       grid:
+        - display: grid
         - grid-template-areas: '"live_feed"'
-        - grid-template-columns: 100%
+        - grid-template-columns: minmax(0, 1fr)
         - grid-template-rows: 100%
+        - width: 100%
+        - height: 100%
       name:
         - position: absolute
         - bottom: 10px
@@ -317,9 +327,37 @@ button_card_templates:
           `;
         ]]]
     extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        height: 225px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 18px !important;
+        box-sizing: border-box !important;
+      }
+      #container {
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+      }
+      @media (max-width: 600px) {
+        ha-card, #card {
+          height: 160px !important;
+        }
+      }
       #live_feed {
-        width: 100%;
-        height: 100%;
+        width: 100% !important;
+        height: 100% !important;
         position: absolute;
         inset: 0;
       }
@@ -509,21 +547,31 @@ button_card_templates:
       - sensor.abholung_papier
       - sensor.abholung_restmull
       - sensor.tibber27a_strompreis
+      - person.daniel
+      - person.tanja
+      - person.stefan
+      - person.simon
+      - person.lukas
     show_icon: false
     show_name: false
     show_state: false
     styles:
       card:
+        - display: block
         - background: var(--card-background-color)
-        - border-radius: 16px
+        - border-radius: 18px
         - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16))
         - padding: 8px 16px
-        - margin: 12px 16px 6px 16px
+        - margin: 0 0 10px 0
+        - width: 100%
+        - box-sizing: border-box
         - box-shadow: var(--ha-card-box-shadow, none)
         - cursor: default
       grid:
+        - display: grid
         - grid-template-areas: '"header_row"'
-        - grid-template-columns: 1fr
+        - grid-template-columns: minmax(0, 1fr)
+        - width: 100%
       custom_fields:
         header_row:
           - width: 100%
@@ -863,6 +911,111 @@ button_card_templates:
             document.body.appendChild(overlay);
           };
 
+          window._kioskOpenMobileNav = () => {
+            const old = document.getElementById('kiosk-modal-overlay');
+            if (old) {
+              if (old._closeHandler) old._closeHandler();
+              else old.remove();
+            }
+
+            const h = window._kioskLatestHass || hass;
+            const stMap = (h && h.states) ? h.states : states;
+            const curPath = window.location.pathname || '/dashboard-kiosk/home';
+
+            const isHome = (id) => stMap[id] && stMap[id].state === 'home';
+            const parentsHome = (isHome('person.daniel') ? 1 : 0) + (isHome('person.tanja') ? 1 : 0);
+
+            const navItems = [
+              { title: 'Home', path: 'home', icon: 'mdi:home-variant', badge: '' },
+              { title: 'Wohnen', path: 'wohnzimmer', icon: 'mdi:sofa', badge: '' },
+              { title: 'Küche', path: 'kueche', icon: 'mdi:fridge', badge: '' },
+              { title: 'Eltern', path: 'parents', icon: 'mdi:account-multiple', badge: parentsHome > 0 ? `${parentsHome}/2 da` : '', green: parentsHome > 0 },
+              { title: 'Stefan', path: 'stefan', icon: 'mdi:account', badge: isHome('person.stefan') ? 'Zuhause' : '', green: isHome('person.stefan') },
+              { title: 'Simon', path: 'simon', icon: 'mdi:gamepad-variant-outline', badge: isHome('person.simon') ? 'Zuhause' : '', green: isHome('person.simon') },
+              { title: 'Lukas', path: 'lukas', icon: 'mdi:laptop', badge: isHome('person.lukas') ? 'Zuhause' : '', green: isHome('person.lukas') },
+              { title: 'Büro', path: 'buero', icon: 'mdi:office-chair', badge: '' },
+              { title: 'Garage', path: 'garage', icon: 'mdi:garage', badge: '' },
+              { title: 'Energie', path: 'energie', icon: 'mdi:flash', badge: '' }
+            ];
+
+            const overlay = document.createElement('div');
+            overlay.id = 'kiosk-modal-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);display:flex;align-items:stretch;justify-content:flex-start;';
+
+            const drawer = document.createElement('div');
+            drawer.style.cssText = 'width:78vw;max-width:300px;height:100%;background:var(--card-background-color, #1c1c1e);color:var(--primary-text-color, #ffffff);border-right:1px solid var(--divider-color, rgba(128,128,128,0.3));box-shadow:16px 0 48px rgba(0,0,0,0.65);display:flex;flex-direction:column;overflow:hidden;';
+            drawer.addEventListener('click', (e) => e.stopPropagation());
+            const closeDrawer = () => overlay.remove();
+            overlay.addEventListener('click', closeDrawer);
+
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--divider-color, rgba(128,128,128,0.2));background:var(--secondary-background-color, rgba(128,128,128,0.08));';
+            header.innerHTML = `
+              <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;">
+                <ha-icon icon="mdi:view-dashboard-outline" style="color:var(--primary-color, #03a9f4);--mdc-icon-size:22px;"></ha-icon>
+                <span>Raum-Navigation</span>
+              </div>
+            `;
+            const closeBtn = document.createElement('button');
+            closeBtn.style.cssText = 'width:34px;height:34px;border-radius:50%;border:1px solid var(--divider-color, rgba(128,128,128,0.3));background:var(--card-background-color);color:var(--primary-text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;';
+            closeBtn.innerHTML = '<ha-icon icon="mdi:close" style="--mdc-icon-size:18px;"></ha-icon>';
+            closeBtn.addEventListener('click', closeDrawer);
+            header.appendChild(closeBtn);
+
+            const list = document.createElement('div');
+            list.style.cssText = 'padding:12px;overflow-y:auto;display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;flex:1;align-content:start;';
+
+            navItems.forEach((item) => {
+              const active = curPath.endsWith('/' + item.path) || (item.path === 'home' && curPath.endsWith('/dashboard-kiosk'));
+              const btn = document.createElement('button');
+              const borderCol = active
+                ? 'var(--primary-color, #03a9f4)'
+                : (item.green ? '#4caf50' : 'var(--divider-color, rgba(128,128,128,0.22))');
+              const bgCol = active
+                ? 'rgba(3, 169, 244, 0.22)'
+                : (item.green ? 'rgba(76, 175, 80, 0.12)' : 'var(--secondary-background-color, rgba(128,128,128,0.08))');
+              btn.style.cssText = `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border-radius:14px;border:1.5px solid ${borderCol};background:${bgCol};color:var(--primary-text-color);cursor:pointer;position:relative;`;
+              btn.innerHTML = `
+                <ha-icon icon="${item.icon}" style="--mdc-icon-size:24px;color:${active ? 'var(--primary-color, #03a9f4)' : (item.green ? '#4caf50' : 'var(--secondary-text-color)')};"></ha-icon>
+                <span style="font-size:13px;font-weight:700;">${item.title}</span>
+                ${item.badge ? `<span style="font-size:10px;font-weight:700;color:#4caf50;">${item.badge}</span>` : ''}
+              `;
+              btn.addEventListener('click', () => {
+                closeDrawer();
+                window.history.pushState(null, '', '/dashboard-kiosk/' + item.path);
+                window.dispatchEvent(new Event('location-changed'));
+              });
+              list.appendChild(btn);
+            });
+
+            const footer = document.createElement('div');
+            footer.style.cssText = 'padding:12px 16px;border-top:1px solid var(--divider-color, rgba(128,128,128,0.2));display:flex;flex-direction:column;gap:8px;';
+
+            const haSidebarBtn = document.createElement('button');
+            haSidebarBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--divider-color, rgba(128,128,128,0.3));background:var(--secondary-background-color, rgba(128,128,128,0.12));color:var(--primary-text-color);font-size:12px;font-weight:700;cursor:pointer;';
+            haSidebarBtn.innerHTML = '<ha-icon icon="mdi:menu-open" style="--mdc-icon-size:18px;color:var(--primary-color, #03a9f4);"></ha-icon><span>HA Hauptmenü / Übersicht öffnen</span>';
+            haSidebarBtn.addEventListener('click', () => {
+              closeDrawer();
+              try {
+                const haEl = document.querySelector('home-assistant');
+                const mainEl = haEl && haEl.shadowRoot ? haEl.shadowRoot.querySelector('home-assistant-main') : null;
+                if (mainEl) {
+                  mainEl.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true }));
+                }
+                window.location.href = '/lovelace/0?disable_km';
+              } catch (e) {
+                window.location.href = '/lovelace/0?disable_km';
+              }
+            });
+            footer.appendChild(haSidebarBtn);
+
+            drawer.appendChild(header);
+            drawer.appendChild(list);
+            drawer.appendChild(footer);
+            overlay.appendChild(drawer);
+            document.body.appendChild(overlay);
+          };
+
           const ccuStyle = ccuCount > 0
             ? 'border:1.5px solid #f44336;background:rgba(244,67,54,0.14);'
             : '';
@@ -895,8 +1048,15 @@ button_card_templates:
           }, 40);
 
           return `
-            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
-              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;box-sizing:border-box;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;">
+                <div class="kiosk-mobile-menu-btn"
+                     onpointerdown="window._kioskLastChip='menu';window._kioskLastChipTs=Date.now();"
+                     onclick="event.stopPropagation();if(window._kioskOpenMobileNav)window._kioskOpenMobileNav();"
+                     style="${chipStyle}cursor:pointer;padding:0 10px;border:1.5px solid var(--primary-color, #03a9f4);background:rgba(3,169,244,0.15);"
+                     title="Raum-Menü öffnen">
+                  <ha-icon icon="mdi:menu" style="--mdc-icon-size:18px;color:var(--primary-color, #03a9f4);pointer-events:none;"></ha-icon>
+                </div>
                 <div class="kiosk-chip-ccu"
                      onpointerdown="window._kioskLastChip='ccu';window._kioskLastChipTs=Date.now();"
                      onclick="event.stopPropagation();if(window._kioskOpenCcuModal)window._kioskOpenCcuModal();"
@@ -926,7 +1086,7 @@ button_card_templates:
                   <span style="color:${priceColor};font-weight:700;">${(price * 100).toFixed(1)} ct</span>
                 </div>
               </div>
-              <div style="display:inline-flex;align-items:center;gap:6px;font-size:20px;font-weight:700;color:var(--primary-text-color);padding-left:8px;flex-shrink:0;">
+              <div style="display:inline-flex;align-items:center;gap:6px;font-size:20px;font-weight:700;color:var(--primary-text-color);padding-left:6px;flex-shrink:0;">
                 <ha-icon icon="mdi:clock-outline" style="--mdc-icon-size:18px;color:var(--primary-color, #03a9f4);"></ha-icon>
                 <span class="kiosk-live-clock-text">${timeStr}</span>
               </div>
@@ -940,13 +1100,42 @@ button_card_templates:
           const chip = window._kioskLastChip;
           const ts = window._kioskLastChipTs || 0;
           window._kioskLastChip = null;
-          if (chip === 'ccu' && (Date.now() - ts) < 2500) {
+          if (chip === 'menu' && (Date.now() - ts) < 2500) {
+            if (window._kioskOpenMobileNav) window._kioskOpenMobileNav();
+          } else if (chip === 'ccu' && (Date.now() - ts) < 2500) {
             if (window._kioskOpenCcuModal) window._kioskOpenCcuModal();
           } else if (chip === 'battery' && (Date.now() - ts) < 2500) {
             if (window._kioskOpenBatteryModal) window._kioskOpenBatteryModal();
           }
         ]]]
     extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 0 10px 0 !important;
+        box-sizing: border-box !important;
+        border-radius: 18px !important;
+      }
+      #container, #header_row {
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .kiosk-mobile-menu-btn {
+        display: none !important;
+      }
+      @media (max-width: 600px) {
+        .kiosk-mobile-menu-btn {
+          display: inline-flex !important;
+        }
+      }
       @keyframes pulse-alert {
         0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.5); }
         50% { transform: scale(1.04); box-shadow: 0 0 10px 3px rgba(244, 67, 54, 0.35); }
@@ -959,16 +1148,31 @@ button_card_templates:
     name: v202610
     styles:
       card:
+        - display: block
         - background: transparent
         - border: none
         - box-shadow: none
-        - padding: 4px 18px 8px 18px
+        - padding: 2px 6px 6px 6px
+        - margin: 0
+        - width: 100%
+        - box-sizing: border-box
+      grid:
+        - display: grid
+        - grid-template-columns: minmax(0, 1fr)
+        - width: 100%
       name:
         - justify-self: end
         - font-size: 11px
         - font-weight: 500
         - color: var(--secondary-text-color)
         - opacity: 0.7
+    extra_styles: |
+      :host, ha-card, #card, #container {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        text-align: right !important;
+      }
 
   weather_footer_bar:
     triggers_update: all
@@ -976,16 +1180,44 @@ button_card_templates:
     show_name: false
     styles:
       card:
+        - display: block
         - background: var(--card-background-color)
-        - border-radius: 18px
+        - border-radius: 20px
         - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16))
-        - padding: 10px 18px
-        - margin: 0 16px 4px 16px
+        - padding: 14px 20px
+        - margin: 0 0 6px 0
+        - width: 100%
+        - box-sizing: border-box
         - box-shadow: var(--ha-card-box-shadow, none)
         - cursor: pointer
       grid:
+        - display: grid
         - grid-template-areas: '"summary"'
-        - grid-template-columns: 1fr
+        - grid-template-columns: minmax(0, 1fr)
+        - width: 100%
+      custom_fields:
+        summary:
+          - width: 100%
+    extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 0 6px 0 !important;
+        border-radius: 20px !important;
+        box-sizing: border-box !important;
+      }
+      #container, #summary {
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
     custom_fields:
       summary: |
         [[[
@@ -1233,8 +1465,8 @@ button_card_templates:
     show_label: true
     styles:
       card:
-        - width: 86px
-        - height: 86px
+        - width: 96px
+        - height: 96px
         - border-radius: 50%
         - padding: 4px
         - z-index: 2
@@ -1372,7 +1604,7 @@ button_card_templates:
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.14); }
       }
-      @media (max-width: 768px) {
+      @media (max-width: 480px) {
         #card {
           width: 72px !important;
           height: 72px !important;
@@ -1635,6 +1867,192 @@ button_card_templates:
           document.body.appendChild(overlay);
         ]]]
 
+  kiosk_page_layout:
+    show_icon: false
+    show_name: false
+    show_state: false
+    styles:
+      card:
+        - display: block
+        - background: var(--primary-background-color)
+        - border: none
+        - border-radius: 0
+        - box-shadow: none
+        - padding: 0
+        - margin: 0
+        - width: 100%
+        - min-height: 100vh
+        - box-sizing: border-box
+        - cursor: default
+      grid:
+        - display: grid
+        - grid-template-areas: '"sidebar main"'
+        - grid-template-columns: 92px minmax(0, 1fr)
+        - grid-template-rows: minmax(100vh, auto)
+        - width: 100%
+        - gap: 0
+        - align-items: stretch
+        - justify-items: stretch
+      custom_fields:
+        sidebar:
+          - width: 92px
+          - min-height: 100vh
+          - align-self: stretch
+        main:
+          - display: block
+          - width: 100%
+          - min-width: 0
+          - min-height: 100vh
+          - padding: 12px 16px
+          - box-sizing: border-box
+          - align-self: stretch
+          - justify-self: stretch
+    extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 100vh !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+        background: var(--primary-background-color) !important;
+      }
+      #container {
+        display: grid !important;
+        grid-template-areas: "sidebar main" !important;
+        grid-template-columns: 92px minmax(0, 1fr) !important;
+        grid-template-rows: minmax(100vh, auto) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 100vh !important;
+        align-items: stretch !important;
+        justify-items: stretch !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+      }
+      #sidebar {
+        width: 92px !important;
+        max-width: 92px !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      #main {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        padding: 12px 16px !important;
+        box-sizing: border-box !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+      }
+      #main > * {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      @media (max-width: 600px) {
+        #container {
+          grid-template-areas: "main" !important;
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+        #sidebar {
+          display: none !important;
+        }
+        #main {
+          padding: 8px 10px !important;
+        }
+      }
+      ha-ripple {
+        display: none !important;
+      }
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    double_tap_action:
+      action: none
+
+  room_grid_wrapper:
+    show_icon: false
+    show_name: false
+    styles:
+      card:
+        - display: block
+        - background: transparent
+        - border: none
+        - box-shadow: none
+        - padding: 0
+        - margin: 0 0 8px 0
+        - width: 100%
+        - box-sizing: border-box
+      grid:
+        - display: grid
+        - grid-template-areas: '"grid"'
+        - grid-template-columns: minmax(0, 1fr)
+        - width: 100%
+      custom_fields:
+        grid:
+          - display: block
+          - width: 100%
+    extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 0 8px 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      ha-ripple {
+        display: none !important;
+      }
+      #container, #grid {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+      }
+      hui-grid-card {
+        display: block !important;
+        width: 100% !important;
+        --grid-card-gap: 12px !important;
+      }
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    double_tap_action:
+      action: none
+
   sidebar_layout:
     styles:
       card:
@@ -1644,7 +2062,10 @@ button_card_templates:
         - border-radius: 0
         - box-shadow: none
         - padding: 12px 6px
-        - height: 100vh
+        - width: 92px
+        - min-height: 100vh
+        - height: 100%
+        - box-sizing: border-box
       grid:
         - grid-template-areas: |
             "home"
@@ -1661,22 +2082,24 @@ button_card_templates:
         - grid-template-rows: repeat(10, minmax(60px, 1fr))
         - gap: 8px
         - align-items: center
+        - justify-items: center
     extra_styles: |
-      @media (max-width: 768px) {
-        #card {
-          padding: 6px !important;
-          height: auto !important;
-          width: 100% !important;
-          border-right: none !important;
-          border-bottom: 1px solid var(--divider-color, rgba(128, 128, 128, 0.18)) !important;
-        }
-        #container {
-          grid-template-areas: none !important;
-          display: flex !important;
-          flex-flow: row wrap !important;
-          justify-content: space-around !important;
-          gap: 6px !important;
-        }
+      :host {
+        display: block !important;
+        width: 92px !important;
+        max-width: 92px !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+      }
+      ha-card, #card {
+        width: 92px !important;
+        max-width: 92px !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+        box-sizing: border-box !important;
+      }
+      #container {
+        justify-items: center !important;
       }
     custom_fields:
       home:
@@ -1788,7 +2211,7 @@ button_card_templates:
               line-height: 16px;
               text-align: center;
             }
-            @media (max-width: 768px) {
+            @media (max-width: 480px) {
               #presence {
                 top: 2px;
                 right: 2px;
@@ -1800,7 +2223,7 @@ button_card_templates:
               #card {
                 width: 64px !important;
                 height: 52px !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
               }
               #entity_picture {
                 width: 24px !important;
@@ -1862,21 +2285,446 @@ button_card_templates:
             active: '[[[ return variables.active_room == "energie" ]]]'
             path: energie
 
+  energy_flow_section:
+    triggers_update: all
+    show_icon: false
+    show_name: false
+    styles:
+      card:
+        - display: block
+        - background: var(--card-background-color)
+        - border-radius: 22px
+        - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16))
+        - padding: 26px 28px
+        - margin: 0 0 12px 0
+        - width: 100%
+        - box-sizing: border-box
+        - box-shadow: var(--ha-card-box-shadow, none)
+        - position: relative
+        - overflow: hidden
+      grid:
+        - display: grid
+        - position: relative
+        - grid-template-areas: |
+            "wash dish dryer"
+            "water pv_center pv_node"
+            "power_grid car autarky_node"
+        - grid-template-columns: repeat(3, minmax(0, 1fr))
+        - grid-template-rows: repeat(3, minmax(126px, 1fr))
+        - width: 100%
+        - gap: 28px 18px
+        - align-items: center
+        - justify-items: center
+    extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 0 12px 0 !important;
+        border-radius: 22px !important;
+        box-sizing: border-box !important;
+      }
+      #container {
+        display: grid !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        grid-template-rows: repeat(3, minmax(126px, 1fr)) !important;
+        gap: 28px 18px !important;
+        align-items: center !important;
+        justify-items: center !important;
+        box-sizing: border-box !important;
+      }
+      #flow_svg {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none !important;
+        z-index: 1 !important;
+      }
+      @media (max-width: 600px) {
+        ha-card, #card {
+          padding: 16px 10px !important;
+        }
+        #container {
+          grid-template-rows: repeat(3, minmax(92px, 1fr)) !important;
+          gap: 16px 8px !important;
+        }
+      }
+      @keyframes kioskFlowParticle {
+        0% {
+          left: var(--sx);
+          top: var(--sy);
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.65);
+        }
+        15% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        85% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+          left: var(--ex);
+          top: var(--ey);
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.65);
+        }
+      }
+    custom_fields:
+      flow_svg: |
+        [[[
+          const getVal = (id) => states[id] ? (parseFloat(states[id].state) || 0) : 0;
+          const washW = Math.round(getVal('sensor.waschmaschine_leistung_2'));
+          const dishW = Math.round(getVal('sensor.geschirrspuler_leistung'));
+          const dryerW = Math.round(getVal('sensor.tz3000_2putqrmw_ts011f_leistung'));
+          const waterW = Math.round(getVal('sensor.heisswasser_pv_leistung'));
+          const dc1 = getVal('sensor.scb_dc1_power');
+          const dc2 = getVal('sensor.scb_dc2_power');
+          const pvSum = getVal('sensor.scb_sum_power_of_all_pv_dc_inputs');
+          const pvW = Math.round((dc1 + dc2) > 0 ? (dc1 + dc2) : pvSum);
+          const gridW = Math.round(getVal('sensor.scb_home_power_from_grid'));
+          const carW = Math.round(getVal('sensor.goe_297534_nrg_11'));
+          const homeW = Math.round(getVal('sensor.scb_home_power'));
+
+          const lines = [
+            {
+              hx: 'calc(50% - 50px)', hy: 'calc(50% - 38px)',
+              nx: 'calc(16.67% + 39px)', ny: 'calc(16.67% + 29px)',
+              lx: '31.5%', ly: '31.5%',
+              w: washW, sign: '-', active: washW > 5, positive: false, inward: false
+            },
+            {
+              hx: '50%', hy: 'calc(50% - 64px)',
+              nx: '50%', ny: 'calc(16.67% + 49px)',
+              lx: '50%', ly: '29.5%',
+              w: dishW, sign: '-', active: dishW > 5, positive: false, inward: false
+            },
+            {
+              hx: 'calc(50% + 50px)', hy: 'calc(50% - 38px)',
+              nx: 'calc(83.33% - 39px)', ny: 'calc(16.67% + 29px)',
+              lx: '68.5%', ly: '31.5%',
+              w: dryerW, sign: '-', active: dryerW > 5, positive: false, inward: false
+            },
+            {
+              hx: 'calc(50% - 64px)', hy: '50%',
+              nx: 'calc(16.67% + 49px)', ny: '50%',
+              lx: '31%', ly: '50%',
+              w: waterW, sign: '-', active: waterW > 5, positive: false, inward: false
+            },
+            {
+              hx: 'calc(50% + 64px)', hy: '50%',
+              nx: 'calc(83.33% - 49px)', ny: '50%',
+              lx: '69%', ly: '50%',
+              w: pvW, sign: '+', active: pvW > 15, positive: true, inward: true
+            },
+            {
+              hx: 'calc(50% - 50px)', hy: 'calc(50% + 38px)',
+              nx: 'calc(16.67% + 39px)', ny: 'calc(83.33% - 29px)',
+              lx: '31.5%', ly: '68.5%',
+              w: gridW, sign: '-', active: gridW > 15, positive: false, inward: false
+            },
+            {
+              hx: '50%', hy: 'calc(50% + 64px)',
+              nx: '50%', ny: 'calc(83.33% - 49px)',
+              lx: '50%', ly: '70.5%',
+              w: carW, sign: '-', active: carW > 15, positive: false, inward: false
+            },
+            {
+              hx: 'calc(50% + 50px)', hy: 'calc(50% + 38px)',
+              nx: 'calc(83.33% - 39px)', ny: 'calc(83.33% - 29px)',
+              lx: '68.5%', ly: '68.5%',
+              w: homeW, sign: '-', active: homeW > 15, positive: false, inward: false
+            }
+          ];
+
+          const guideCoords = [
+            { x1: 37, y1: 37, x2: 24, y2: 24 },
+            { x1: 50, y1: 34, x2: 50, y2: 26 },
+            { x1: 63, y1: 37, x2: 76, y2: 24 },
+            { x1: 39, y1: 50, x2: 25, y2: 50 },
+            { x1: 61, y1: 50, x2: 75, y2: 50 },
+            { x1: 37, y1: 63, x2: 24, y2: 76 },
+            { x1: 50, y1: 66, x2: 50, y2: 74 },
+            { x1: 63, y1: 63, x2: 76, y2: 76 }
+          ];
+
+          const svgLines = lines.map((l, idx) => {
+            const g = guideCoords[idx];
+            const strokeColor = !l.active
+              ? 'var(--divider-color, rgba(128,128,128,0.28))'
+              : (l.positive ? 'rgba(76,175,80,0.38)' : 'rgba(255,152,0,0.38)');
+            return `<line x1="${g.x1}%" y1="${g.y1}%" x2="${g.x2}%" y2="${g.y2}%" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" vector-effect="non-scaling-stroke" />`;
+          }).join('');
+
+          const htmlParticles = lines.map((l) => {
+            if (!l.active) return '';
+            const dotColor = l.positive ? '#4caf50' : '#ff9800';
+            const dotGlow = l.positive ? 'rgba(76,175,80,0.65)' : 'rgba(255,152,0,0.65)';
+            const sx = l.inward ? l.nx : l.hx;
+            const sy = l.inward ? l.ny : l.hy;
+            const ex = l.inward ? l.hx : l.nx;
+            const ey = l.inward ? l.hy : l.ny;
+            return [0, -1.13, -2.26].map((delay) => `
+              <div style="
+                position:absolute;
+                width:7px;
+                height:7px;
+                border-radius:50%;
+                background:${dotColor};
+                box-shadow:0 0 6px ${dotGlow};
+                --sx:${sx};
+                --sy:${sy};
+                --ex:${ex};
+                --ey:${ey};
+                animation:kioskFlowParticle 3.4s linear ${delay}s infinite;
+              "></div>
+            `).join('');
+          }).join('');
+
+          const htmlBadges = lines.map((l) => {
+            const txt = l.w > 0 ? `${l.sign}${l.w} W` : '0 W';
+            const borderCol = !l.active
+              ? 'var(--divider-color, rgba(128,128,128,0.28))'
+              : (l.positive ? '#4caf50' : '#ff9800');
+            const txtCol = !l.active
+              ? 'var(--secondary-text-color)'
+              : (l.positive ? '#4caf50' : '#ff9800');
+            return `
+              <div style="position:absolute;left:${l.lx};top:${l.ly};transform:translate(-50%,-50%);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:var(--card-background-color);color:${txtCol};border:1.5px solid ${borderCol};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:2;">
+                ${txt}
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <div style="position:relative;width:100%;height:100%;">
+              <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+                ${svgLines}
+              </svg>
+              ${htmlParticles}
+              ${htmlBadges}
+            </div>
+          `;
+        ]]]
+      pv_center:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.pv_battery_emhass_status
+          name: Haus & Akku
+          icon: mdi:home-battery
+          variables:
+            node_type: house
+            modal_title: Haus-Batterie & Kostal Speicher
+            modal_icon: mdi:home-battery
+            power_sensor: sensor.scb_battery_power
+            json_helper: input_text.pv_battery_emhass_json
+            deferrable_sensor: sensor.p_deferrable5
+          styles:
+            card:
+              - width: 126px
+              - height: 126px
+              - border-radius: 50%
+              - z-index: 3
+              - background: |
+                  [[[
+                    const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
+                    const col = soc >= 50 ? '76, 175, 80' : (soc >= 25 ? '255, 193, 7' : '244, 67, 54');
+                    return `radial-gradient(circle, rgba(${col}, 0.28) 0%, var(--card-background-color) 85%)`;
+                  ]]]
+              - border: |
+                  [[[
+                    const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
+                    const hex = soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
+                    return `3px solid ${hex}`;
+                  ]]]
+              - box-shadow: 0 0 22px rgba(76, 175, 80, 0.35)
+            icon:
+              - width: 34px
+              - color: |
+                  [[[
+                    const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
+                    return soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
+                  ]]]
+            name:
+              - font-size: 11px
+              - font-weight: 700
+              - color: var(--primary-text-color)
+            label:
+              - font-size: 14px
+              - font-weight: 800
+              - color: |
+                  [[[
+                    const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
+                    return soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
+                  ]]]
+          label: |
+            [[[
+              const soc = states['sensor.scb_battery_soc'] ? states['sensor.scb_battery_soc'].state : '-';
+              const battW = states['sensor.scb_battery_power'] ? Math.round(parseFloat(states['sensor.scb_battery_power'].state) || 0) : 0;
+              const flowStr = battW < -10 ? ` ↑${Math.abs(battW)}W` : (battW > 10 ? ` ↓${battW}W` : '');
+              return `${soc}%${flowStr}`;
+            ]]]
+      wash:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.washing_machine_emhass_status
+          name: Waschmaschine
+          icon: mdi:washing-machine
+          variables:
+            node_type: appliance
+            modal_title: Waschmaschine
+            modal_icon: mdi:washing-machine
+            power_sensor: sensor.waschmaschine_leistung_2
+            json_helper: input_text.washing_machine_emhass_json
+            deferrable_sensor: sensor.p_deferrable2
+      dish:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.dishwasher_emhass_status
+          name: Geschirrspüler
+          icon: mdi:dishwasher
+          variables:
+            node_type: appliance
+            modal_title: Geschirrspüler
+            modal_icon: mdi:dishwasher
+            power_sensor: sensor.geschirrspuler_leistung
+            json_helper: input_text.dishwasher_emhass_json
+            deferrable_sensor: sensor.p_deferrable0
+      dryer:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.tumble_dryer_emhass_status
+          name: Trockner
+          icon: mdi:tumble-dryer
+          variables:
+            node_type: appliance
+            modal_title: Wäschetrockner
+            modal_icon: mdi:tumble-dryer
+            power_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
+            json_helper: input_text.tumble_dryer_emhass_json
+            deferrable_sensor: sensor.p_deferrable1
+      water:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.water_bioler_emhass_status
+          name: Heißwasser
+          icon: mdi:water-boiler
+          variables:
+            node_type: appliance
+            modal_title: Heißwasser-Boiler
+            modal_icon: mdi:water-boiler
+            power_sensor: sensor.heisswasser_pv_leistung
+            json_helper: input_text.water_bioler_emhass_json
+            deferrable_sensor: sensor.p_deferrable3
+      pv_node:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: sensor.scb_sum_power_of_all_pv_dc_inputs
+          name: PV Anlage
+          icon: mdi:solar-power
+          variables:
+            node_type: pv
+            modal_title: PV-Anlage (Kostal DC1 + DC2)
+            modal_icon: mdi:solar-power
+            power_sensor: sensor.scb_sum_power_of_all_pv_dc_inputs
+      power_grid:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: sensor.scb_home_power_from_grid
+          name: Stromnetz
+          icon: mdi:transmission-tower
+          variables:
+            node_type: grid
+            modal_title: Stromnetz & Tibber Tarif
+            modal_icon: mdi:transmission-tower
+            power_sensor: sensor.scb_home_power_from_grid
+      car:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: input_select.wallbox_emhass_status
+          name: Wallbox
+          icon: mdi:ev-station
+          variables:
+            node_type: wallbox
+            modal_title: go-eCharger Wallbox (Auto)
+            modal_icon: mdi:ev-station
+            power_sensor: sensor.goe_297534_nrg_11
+            json_helper: input_text.wallbox_emhass_json
+            deferrable_sensor: sensor.p_deferrable4
+      autarky_node:
+        card:
+          type: custom:button-card
+          template: energy_node_card
+          entity: sensor.scb_home_power
+          name: Hauslast
+          icon: mdi:home-lightning-bolt-outline
+          variables:
+            node_type: grid
+            modal_title: Hausverbrauch & Autarkie
+            modal_icon: mdi:home-lightning-bolt-outline
+            power_sensor: sensor.scb_home_power
+
   room_header_card:
     triggers_update: all
     show_icon: false
     show_name: false
     styles:
       card:
+        - display: block
         - background: var(--card-background-color)
         - border-radius: 18px
         - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16))
         - padding: 14px 20px
-        - margin: 6px 16px
+        - margin: 0 0 10px 0
+        - width: 100%
+        - box-sizing: border-box
         - box-shadow: var(--ha-card-box-shadow, none)
       grid:
+        - display: grid
         - grid-template-areas: '"header"'
-        - grid-template-columns: 1fr
+        - grid-template-columns: minmax(0, 1fr)
+        - width: 100%
+      custom_fields:
+        header:
+          - width: 100%
+    extra_styles: |
+      :host {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ha-card, #card {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 0 10px 0 !important;
+        border-radius: 18px !important;
+        box-sizing: border-box !important;
+      }
+      #container, #header {
+        width: 100% !important;
+        min-width: 100% !important;
+        box-sizing: border-box !important;
+      }
     custom_fields:
       header: |
         [[[
@@ -2187,1530 +3035,873 @@ views:
     path: home
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child {
-              width: 92px !important;
-              margin: 0 !important;
-            }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child {
-                width: 100% !important;
-                height: auto !important;
-                order: 1 !important;
-              }
-              div#root > *:last-child {
-                width: 100% !important;
-                min-height: auto !important;
-                order: 2 !important;
-              }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: home
-          - type: vertical-stack
-            cards:
-              - type: custom:button-card
-                template: top_header_bar
-              - type: custom:button-card
-                styles:
-                  card:
-                    - background: transparent
-                    - border: none
-                    - box-shadow: none
-                    - padding: 0
-                    - margin: 8px 16px 0 16px
-                  grid:
-                    - grid-template-areas: '"entryway backyard"'
-                    - grid-template-columns: 3fr 1fr
-                    - gap: 12px
-                custom_fields:
-                  entryway:
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: home
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  show_icon: false
+                  show_name: false
+                  styles:
                     card:
-                      type: custom:button-card
-                      template: camera_card
-                      entity: camera.entryway
-                      name: Eingang
-                      aspect_ratio: 21/9
-                  backyard:
-                    card:
-                      type: custom:button-card
-                      template: camera_card
-                      entity: camera.backyard
-                      name: Garten
-                      aspect_ratio: 4/3
-              - type: custom:button-card
-                triggers_update: all
-                styles:
-                  card:
-                    - background: var(--card-background-color)
-                    - border-radius: 22px
-                    - border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16))
-                    - padding: 20px 16px
-                    - margin: 12px 16px
-                    - box-shadow: var(--ha-card-box-shadow, none)
-                    - position: relative
-                    - overflow: hidden
-                  grid:
-                    - position: relative
-                    - grid-template-areas: |
-                        "wash dish dryer"
-                        "water pv_center pv_node"
-                        "power_grid car autarky_node"
-                    - grid-template-columns: repeat(3, 1fr)
-                    - grid-template-rows: repeat(3, minmax(92px, 1fr))
-                    - gap: 22px 16px
-                    - align-items: center
-                    - justify-items: center
-                extra_styles: |
-                  #flow_svg {
-                    position: absolute !important;
-                    inset: 0 !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                    pointer-events: none !important;
-                    z-index: 1 !important;
-                  }
-                  @keyframes kioskFlowParticle {
-                    0% {
-                      left: var(--sx);
-                      top: var(--sy);
-                      opacity: 0;
-                      transform: translate(-50%, -50%) scale(0.65);
+                      - display: block
+                      - background: transparent
+                      - border: none
+                      - box-shadow: none
+                      - padding: 0
+                      - margin: 0 0 12px 0
+                      - width: 100%
+                      - box-sizing: border-box
+                    grid:
+                      - display: grid
+                      - grid-template-areas: '"entryway backyard"'
+                      - grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr)
+                      - width: 100%
+                      - gap: 12px
+                      - align-items: stretch
+                  extra_styles: |
+                    :host {
+                      display: block !important;
+                      width: 100% !important;
+                      min-width: 100% !important;
+                      box-sizing: border-box !important;
                     }
-                    15% {
-                      opacity: 1;
-                      transform: translate(-50%, -50%) scale(1);
+                    ha-card, #card {
+                      display: block !important;
+                      width: 100% !important;
+                      min-width: 100% !important;
+                      margin: 0 0 12px 0 !important;
+                      padding: 0 !important;
+                      box-sizing: border-box !important;
                     }
-                    85% {
-                      opacity: 1;
-                      transform: translate(-50%, -50%) scale(1);
+                    #container {
+                      display: grid !important;
+                      grid-template-areas: "entryway backyard" !important;
+                      grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr) !important;
+                      gap: 12px !important;
+                      width: 100% !important;
+                      min-width: 100% !important;
+                      align-items: stretch !important;
+                      justify-items: stretch !important;
+                      box-sizing: border-box !important;
                     }
-                    100% {
-                      left: var(--ex);
-                      top: var(--ey);
-                      opacity: 0;
-                      transform: translate(-50%, -50%) scale(0.65);
+                    #entryway, #backyard {
+                      display: block !important;
+                      width: 100% !important;
+                      min-width: 0 !important;
+                      box-sizing: border-box !important;
                     }
-                  }
-                custom_fields:
-                  flow_svg: |
-                    [[[
-                      const getVal = (id) => states[id] ? (parseFloat(states[id].state) || 0) : 0;
-                      const washW = Math.round(getVal('sensor.waschmaschine_leistung_2'));
-                      const dishW = Math.round(getVal('sensor.geschirrspuler_leistung'));
-                      const dryerW = Math.round(getVal('sensor.tz3000_2putqrmw_ts011f_leistung'));
-                      const waterW = Math.round(getVal('sensor.heisswasser_pv_leistung'));
-                      const dc1 = getVal('sensor.scb_dc1_power');
-                      const dc2 = getVal('sensor.scb_dc2_power');
-                      const pvSum = getVal('sensor.scb_sum_power_of_all_pv_dc_inputs');
-                      const pvW = Math.round((dc1 + dc2) > 0 ? (dc1 + dc2) : pvSum);
-                      const gridW = Math.round(getVal('sensor.scb_home_power_from_grid'));
-                      const carW = Math.round(getVal('sensor.goe_297534_nrg_11'));
-                      const homeW = Math.round(getVal('sensor.scb_home_power'));
-
-                      // Coordinates connect the outer perimeter of the central House circle (112px -> r=56px)
-                      // to the outer perimeter of each appliance/source circle (86px -> r=43px).
-                      // Consumers flow outward from the House edge -> appliance edge;
-                      // PV/Grid supply flows inward from the outer node edge -> House edge.
-                      const lines = [
-                        // Top-left: Waschmaschine (center -> 17%, 17%)
-                        {
-                          hx: 'calc(50% - 45px)', hy: 'calc(50% - 34px)',
-                          nx: 'calc(16.67% + 35px)', ny: 'calc(16.67% + 26px)',
-                          lx: '31.5%', ly: '31.5%',
-                          w: washW, sign: '-', active: washW > 5, positive: false, inward: false
-                        },
-                        // Top-center: Geschirrspueler (center -> 50%, 17%)
-                        {
-                          hx: '50%', hy: 'calc(50% - 57px)',
-                          nx: '50%', ny: 'calc(16.67% + 44px)',
-                          lx: '50%', ly: '29.5%',
-                          w: dishW, sign: '-', active: dishW > 5, positive: false, inward: false
-                        },
-                        // Top-right: Trockner (center -> 83%, 17%)
-                        {
-                          hx: 'calc(50% + 45px)', hy: 'calc(50% - 34px)',
-                          nx: 'calc(83.33% - 35px)', ny: 'calc(16.67% + 26px)',
-                          lx: '68.5%', ly: '31.5%',
-                          w: dryerW, sign: '-', active: dryerW > 5, positive: false, inward: false
-                        },
-                        // Mid-left: Warmwasser (center -> 17%, 50%)
-                        {
-                          hx: 'calc(50% - 57px)', hy: '50%',
-                          nx: 'calc(16.67% + 44px)', ny: '50%',
-                          lx: '31%', ly: '50%',
-                          w: waterW, sign: '-', active: waterW > 5, positive: false, inward: false
-                        },
-                        // Mid-right: PV-Erzeugung (83%, 50% -> center)
-                        {
-                          hx: 'calc(50% + 57px)', hy: '50%',
-                          nx: 'calc(83.33% - 44px)', ny: '50%',
-                          lx: '69%', ly: '50%',
-                          w: pvW, sign: '+', active: pvW > 15, positive: true, inward: true
-                        },
-                        // Bottom-left: Netzbezug (17%, 83% -> center)
-                        {
-                          hx: 'calc(50% - 45px)', hy: 'calc(50% + 34px)',
-                          nx: 'calc(16.67% + 35px)', ny: 'calc(83.33% - 26px)',
-                          lx: '31.5%', ly: '68.5%',
-                          w: gridW, sign: '-', active: gridW > 15, positive: false, inward: false
-                        },
-                        // Bottom-center: Wallbox (center -> 50%, 83%)
-                        {
-                          hx: '50%', hy: 'calc(50% + 57px)',
-                          nx: '50%', ny: 'calc(83.33% - 44px)',
-                          lx: '50%', ly: '70.5%',
-                          w: carW, sign: '-', active: carW > 15, positive: false, inward: false
-                        },
-                        // Bottom-right: Hauslast / Autarkie (center -> 83%, 83%)
-                        {
-                          hx: 'calc(50% + 45px)', hy: 'calc(50% + 34px)',
-                          nx: 'calc(83.33% - 35px)', ny: 'calc(83.33% - 26px)',
-                          lx: '68.5%', ly: '68.5%',
-                          w: homeW, sign: '-', active: homeW > 15, positive: false, inward: false
-                        }
-                      ];
-
-                      // Static subtle guide tracks between perimeter of House circle and outer circles
-                      const guideCoords = [
-                        { x1: 37, y1: 37, x2: 24, y2: 24 },
-                        { x1: 50, y1: 34, x2: 50, y2: 26 },
-                        { x1: 63, y1: 37, x2: 76, y2: 24 },
-                        { x1: 39, y1: 50, x2: 25, y2: 50 },
-                        { x1: 61, y1: 50, x2: 75, y2: 50 },
-                        { x1: 37, y1: 63, x2: 24, y2: 76 },
-                        { x1: 50, y1: 66, x2: 50, y2: 74 },
-                        { x1: 63, y1: 63, x2: 76, y2: 76 }
-                      ];
-
-                      const svgLines = lines.map((l, idx) => {
-                        const g = guideCoords[idx];
-                        const strokeColor = !l.active
-                          ? 'var(--divider-color, rgba(128,128,128,0.28))'
-                          : (l.positive ? 'rgba(76,175,80,0.38)' : 'rgba(255,152,0,0.38)');
-                        return `<line x1="${g.x1}%" y1="${g.y1}%" x2="${g.x2}%" y2="${g.y2}%" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" vector-effect="non-scaling-stroke" />`;
-                      }).join('');
-
-                      // True circular dots (7px x 7px) starting at the outer perimeter of the House circle
-                      // with calm 3.4s traversal speed
-                      const htmlParticles = lines.map((l) => {
-                        if (!l.active) return '';
-                        const dotColor = l.positive ? '#4caf50' : '#ff9800';
-                        const dotGlow = l.positive ? 'rgba(76,175,80,0.65)' : 'rgba(255,152,0,0.65)';
-                        const sx = l.inward ? l.nx : l.hx;
-                        const sy = l.inward ? l.ny : l.hy;
-                        const ex = l.inward ? l.hx : l.nx;
-                        const ey = l.inward ? l.hy : l.ny;
-                        return [0, -1.13, -2.26].map((delay) => `
-                          <div style="
-                            position:absolute;
-                            width:7px;
-                            height:7px;
-                            border-radius:50%;
-                            background:${dotColor};
-                            box-shadow:0 0 6px ${dotGlow};
-                            --sx:${sx};
-                            --sy:${sy};
-                            --ex:${ex};
-                            --ey:${ey};
-                            animation:kioskFlowParticle 3.4s linear ${delay}s infinite;
-                          "></div>
-                        `).join('');
-                      }).join('');
-
-                      const htmlBadges = lines.map((l) => {
-                        const txt = l.w > 0 ? `${l.sign}${l.w} W` : '0 W';
-                        const borderCol = !l.active
-                          ? 'var(--divider-color, rgba(128,128,128,0.28))'
-                          : (l.positive ? '#4caf50' : '#ff9800');
-                        const txtCol = !l.active
-                          ? 'var(--secondary-text-color)'
-                          : (l.positive ? '#4caf50' : '#ff9800');
-                        return `
-                          <div style="position:absolute;left:${l.lx};top:${l.ly};transform:translate(-50%,-50%);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:var(--card-background-color);color:${txtCol};border:1.5px solid ${borderCol};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:2;">
-                            ${txt}
-                          </div>
-                        `;
-                      }).join('');
-
-                      return `
-                        <div style="position:relative;width:100%;height:100%;">
-                          <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
-                            ${svgLines}
-                          </svg>
-                          ${htmlParticles}
-                          ${htmlBadges}
-                        </div>
-                      `;
-                    ]]]
-                  pv_center:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.pv_battery_emhass_status
-                      name: Haus & Akku
-                      icon: mdi:home-battery
-                      variables:
-                        node_type: house
-                        modal_title: Haus-Batterie & Kostal Speicher
-                        modal_icon: mdi:home-battery
-                        power_sensor: sensor.scb_battery_power
-                        json_helper: input_text.pv_battery_emhass_json
-                        deferrable_sensor: sensor.p_deferrable5
-                      styles:
-                        card:
-                          - width: 112px
-                          - height: 112px
-                          - border-radius: 50%
-                          - z-index: 3
-                          - background: |
-                              [[[
-                                const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
-                                const col = soc >= 50 ? '76, 175, 80' : (soc >= 25 ? '255, 193, 7' : '244, 67, 54');
-                                return `radial-gradient(circle, rgba(${col}, 0.28) 0%, var(--card-background-color) 85%)`;
-                              ]]]
-                          - border: |
-                              [[[
-                                const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
-                                const hex = soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
-                                return `3px solid ${hex}`;
-                              ]]]
-                          - box-shadow: 0 0 22px rgba(76, 175, 80, 0.35)
-                        icon:
-                          - width: 34px
-                          - color: |
-                              [[[
-                                const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
-                                return soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
-                              ]]]
-                        name:
-                          - font-size: 11px
-                          - font-weight: 700
-                          - color: var(--primary-text-color)
-                        label:
-                          - font-size: 14px
-                          - font-weight: 800
-                          - color: |
-                              [[[
-                                const soc = states['sensor.scb_battery_soc'] ? (parseInt(states['sensor.scb_battery_soc'].state, 10) || 0) : 0;
-                                return soc >= 50 ? '#4caf50' : (soc >= 25 ? '#ffc107' : '#f44336');
-                              ]]]
-                      label: |
-                        [[[
-                          const soc = states['sensor.scb_battery_soc'] ? states['sensor.scb_battery_soc'].state : '-';
-                          const battW = states['sensor.scb_battery_power'] ? Math.round(parseFloat(states['sensor.scb_battery_power'].state) || 0) : 0;
-                          const flowStr = battW < -10 ? ` ↑${Math.abs(battW)}W` : (battW > 10 ? ` ↓${battW}W` : '');
-                          return `${soc}%${flowStr}`;
-                        ]]]
-                  wash:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.washing_machine_emhass_status
-                      name: Waschmaschine
-                      icon: mdi:washing-machine
-                      variables:
-                        node_type: appliance
-                        modal_title: Waschmaschine
-                        modal_icon: mdi:washing-machine
-                        power_sensor: sensor.waschmaschine_leistung_2
-                        json_helper: input_text.washing_machine_emhass_json
-                        deferrable_sensor: sensor.p_deferrable2
-                  dish:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.dishwasher_emhass_status
-                      name: Geschirrspüler
-                      icon: mdi:dishwasher
-                      variables:
-                        node_type: appliance
-                        modal_title: Geschirrspüler
-                        modal_icon: mdi:dishwasher
-                        power_sensor: sensor.geschirrspuler_leistung
-                        json_helper: input_text.dishwasher_emhass_json
-                        deferrable_sensor: sensor.p_deferrable0
-                  dryer:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.tumble_dryer_emhass_status
-                      name: Trockner
-                      icon: mdi:tumble-dryer
-                      variables:
-                        node_type: appliance
-                        modal_title: Wäschetrockner
-                        modal_icon: mdi:tumble-dryer
-                        power_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
-                        json_helper: input_text.tumble_dryer_emhass_json
-                        deferrable_sensor: sensor.p_deferrable1
-                  water:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.water_bioler_emhass_status
-                      name: Heißwasser
-                      icon: mdi:water-boiler
-                      variables:
-                        node_type: appliance
-                        modal_title: Heißwasser-Boiler
-                        modal_icon: mdi:water-boiler
-                        power_sensor: sensor.heisswasser_pv_leistung
-                        json_helper: input_text.water_bioler_emhass_json
-                        deferrable_sensor: sensor.p_deferrable3
-                  pv_node:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: sensor.scb_sum_power_of_all_pv_dc_inputs
-                      name: PV Anlage
-                      icon: mdi:solar-power
-                      variables:
-                        node_type: pv
-                        modal_title: PV-Anlage (Kostal DC1 + DC2)
-                        modal_icon: mdi:solar-power
-                        power_sensor: sensor.scb_sum_power_of_all_pv_dc_inputs
-                  power_grid:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: sensor.scb_home_power_from_grid
-                      name: Stromnetz
-                      icon: mdi:transmission-tower
-                      variables:
-                        node_type: grid
-                        modal_title: Stromnetz & Tibber Tarif
-                        modal_icon: mdi:transmission-tower
-                        power_sensor: sensor.scb_home_power_from_grid
-                  car:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: input_select.wallbox_emhass_status
-                      name: Wallbox
-                      icon: mdi:ev-station
-                      variables:
-                        node_type: wallbox
-                        modal_title: go-eCharger Wallbox (Auto)
-                        modal_icon: mdi:ev-station
-                        power_sensor: sensor.goe_297534_nrg_11
-                        json_helper: input_text.wallbox_emhass_json
-                        deferrable_sensor: sensor.p_deferrable4
-                  autarky_node:
-                    card:
-                      type: custom:button-card
-                      template: energy_node_card
-                      entity: sensor.scb_home_power
-                      name: Hauslast
-                      icon: mdi:home-lightning-bolt-outline
-                      variables:
-                        node_type: grid
-                        modal_title: Hausverbrauch & Autarkie
-                        modal_icon: mdi:home-lightning-bolt-outline
-                        power_sensor: sensor.scb_home_power
-              - type: custom:apexcharts-card
-                card_mod:
-                  style: |
-                    ha-card {
-                      margin: 0 16px 8px 16px !important;
-                      border-radius: 20px !important;
-                      border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                      background: var(--card-background-color) !important;
-                      box-shadow: var(--ha-card-box-shadow, none) !important;
-                      padding: 4px 8px 0 8px !important;
+                    @media (max-width: 600px) {
+                      #container {
+                        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) !important;
+                        gap: 8px !important;
+                      }
                     }
-                header:
-                  show: true
-                  title: Energie-Prognose (-1h bis +24h)
-                  show_states: false
-                  colorize_states: true
-                graph_span: 25h
-                span:
-                  start: hour
-                  offset: -1h
-                now:
-                  show: true
-                  label: Jetzt
-                  color: '#f44336'
-                apex_config:
-                  chart:
-                    height: 175px
-                    toolbar:
-                      show: false
-                  grid:
-                    borderColor: rgba(128, 128, 128, 0.15)
-                    strokeDashArray: 3
-                  legend:
+                  custom_fields:
+                    entryway:
+                      card:
+                        type: custom:button-card
+                        template: camera_card
+                        entity: camera.entryway
+                        name: Eingang
+                    backyard:
+                      card:
+                        type: custom:button-card
+                        template: camera_card
+                        entity: camera.backyard
+                        name: Garten
+                - type: custom:button-card
+                  template: energy_flow_section
+                - type: custom:apexcharts-card
+                  card_mod:
+                    style: |
+                      ha-card {
+                        margin: 0 0 10px 0 !important;
+                        width: 100% !important;
+                        box-sizing: border-box !important;
+                        border-radius: 20px !important;
+                        border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                        background: var(--card-background-color) !important;
+                        box-shadow: var(--ha-card-box-shadow, none) !important;
+                        padding: 6px 10px 2px 10px !important;
+                      }
+                  header:
                     show: true
-                    position: top
-                    horizontalAlign: right
-                    fontSize: 11px
-                    labels:
-                      useSeriesColors: true
-                  xaxis:
-                    labels:
-                      datetimeUTC: false
-                      format: HH:mm
-                      style:
-                        colors: var(--secondary-text-color)
-                        fontSize: 10px
-                  tooltip:
-                    enabled: true
-                    shared: true
-                yaxis:
-                  - id: power
-                    min: 0
-                    decimals: 0
-                    apex_config:
-                      tickAmount: 4
+                    title: Energie-Prognose (-1h bis +24h)
+                    show_states: false
+                    colorize_states: true
+                  graph_span: 25h
+                  span:
+                    start: hour
+                    offset: -1h
+                  now:
+                    show: true
+                    label: Jetzt
+                    color: '#f44336'
+                  apex_config:
+                    chart:
+                      height: 205px
+                      toolbar:
+                        show: false
+                    grid:
+                      borderColor: rgba(128, 128, 128, 0.15)
+                      strokeDashArray: 3
+                    legend:
+                      show: true
+                      position: top
+                      horizontalAlign: right
+                      fontSize: 11px
                       labels:
+                        useSeriesColors: true
+                    xaxis:
+                      labels:
+                        datetimeUTC: false
+                        format: HH:mm
                         style:
                           colors: var(--secondary-text-color)
                           fontSize: 10px
-                      title:
-                        text: W
-                        style:
-                          color: var(--secondary-text-color)
-                          fontSize: 10px
-                  - id: price
-                    opposite: true
-                    decimals: 1
-                    apex_config:
-                      tickAmount: 4
-                      labels:
-                        style:
-                          colors: var(--secondary-text-color)
-                          fontSize: 10px
-                      title:
-                        text: ct/kWh
-                        style:
-                          color: var(--secondary-text-color)
-                          fontSize: 10px
-                series:
-                  - entity: sensor.tibber_rohdaten_cache
-                    name: Tibber (ct)
-                    yaxis_id: price
-                    type: line
-                    curve: stepline
-                    stroke_width: 2
-                    color: '#e74c3c'
-                    float_precision: 1
-                    show:
-                      legend_value: false
-                      in_header: false
-                    data_generator: |
-                      const prices = (entity && entity.attributes && entity.attributes.price_data) ? entity.attributes.price_data : [];
-                      return prices.map(item => [new Date(item.start_time).getTime(), item.price * 100]);
-                  - entity: sensor.solcast_pv_forecast_prognose_heute
-                    name: Solcast PV (W)
-                    yaxis_id: power
-                    type: area
-                    curve: smooth
-                    stroke_width: 2
-                    color: '#ffc107'
-                    opacity: 0.22
-                    show:
-                      legend_value: false
-                      in_header: false
-                    data_generator: |
-                      const today = (entity && entity.attributes && entity.attributes.detailedForecast) ? entity.attributes.detailedForecast : [];
-                      const tomorrowState = hass.states['sensor.solcast_pv_forecast_prognose_morgen'];
-                      const tomorrow = (tomorrowState && tomorrowState.attributes && tomorrowState.attributes.detailedForecast) ? tomorrowState.attributes.detailedForecast : [];
-                      return today.concat(tomorrow).map(item => [new Date(item.period_start).getTime(), Math.round(item.pv_estimate * 1000)]);
-                  - entity: sensor.scb_sum_power_of_all_pv_dc_inputs
-                    name: PV Ist (W)
-                    yaxis_id: power
-                    type: line
-                    curve: smooth
-                    color: '#4caf50'
-                    stroke_width: 2
-                    extend_to: now
-                    show:
-                      legend_value: false
-                      in_header: false
-                  - entity: sensor.scb_home_power
-                    name: Hauslast (W)
-                    yaxis_id: power
-                    type: line
-                    curve: smooth
-                    color: '#03a9f4'
-                    stroke_width: 1.5
-                    extend_to: now
-                    show:
-                      legend_value: false
-                      in_header: false
-              - type: custom:button-card
-                template: weather_footer_bar
-              - type: custom:button-card
-                template: version_footer
+                    tooltip:
+                      enabled: true
+                      shared: true
+                  yaxis:
+                    - id: power
+                      min: 0
+                      decimals: 0
+                      apex_config:
+                        tickAmount: 4
+                        labels:
+                          style:
+                            colors: var(--secondary-text-color)
+                            fontSize: 10px
+                        title:
+                          text: W
+                          style:
+                            color: var(--secondary-text-color)
+                            fontSize: 10px
+                    - id: price
+                      opposite: true
+                      decimals: 1
+                      apex_config:
+                        tickAmount: 4
+                        labels:
+                          style:
+                            colors: var(--secondary-text-color)
+                            fontSize: 10px
+                        title:
+                          text: ct/kWh
+                          style:
+                            color: var(--secondary-text-color)
+                            fontSize: 10px
+                  series:
+                    - entity: sensor.tibber_rohdaten_cache
+                      name: Tibber (ct)
+                      yaxis_id: price
+                      type: line
+                      curve: stepline
+                      stroke_width: 2
+                      color: '#e74c3c'
+                      float_precision: 1
+                      show:
+                        legend_value: false
+                        in_header: false
+                      data_generator: |
+                        const prices = (entity && entity.attributes && entity.attributes.price_data) ? entity.attributes.price_data : [];
+                        return prices.map(item => [new Date(item.start_time).getTime(), item.price * 100]);
+                    - entity: sensor.solcast_pv_forecast_prognose_heute
+                      name: Solcast PV (W)
+                      yaxis_id: power
+                      type: area
+                      curve: smooth
+                      stroke_width: 2
+                      color: '#ffc107'
+                      opacity: 0.22
+                      show:
+                        legend_value: false
+                        in_header: false
+                      data_generator: |
+                        const today = (entity && entity.attributes && entity.attributes.detailedForecast) ? entity.attributes.detailedForecast : [];
+                        const tomorrowState = hass.states['sensor.solcast_pv_forecast_prognose_morgen'];
+                        const tomorrow = (tomorrowState && tomorrowState.attributes && tomorrowState.attributes.detailedForecast) ? tomorrowState.attributes.detailedForecast : [];
+                        return today.concat(tomorrow).map(item => [new Date(item.period_start).getTime(), Math.round(item.pv_estimate * 1000)]);
+                    - entity: sensor.scb_sum_power_of_all_pv_dc_inputs
+                      name: PV Ist (W)
+                      yaxis_id: power
+                      type: line
+                      curve: smooth
+                      color: '#4caf50'
+                      stroke_width: 2
+                      extend_to: now
+                      show:
+                        legend_value: false
+                        in_header: false
+                    - entity: sensor.scb_home_power
+                      name: Hauslast (W)
+                      yaxis_id: power
+                      type: line
+                      curve: smooth
+                      color: '#03a9f4'
+                      stroke_width: 1.5
+                      extend_to: now
+                      show:
+                        legend_value: false
+                        in_header: false
+                - type: custom:button-card
+                  template: weather_footer_bar
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Wohnen
     path: wohnzimmer
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: wohnen
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Wohnbereich
-                      room_subtitle: Erdgeschoss • Heizung, Rollläden & Medien
-                      room_icon: mdi:sofa-outline
-                      temp_sensor: sensor.wohnzimmer_thermostat_temperatur
-                      hum_sensor: sensor.wohnzimmer_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.terrassentur_2
-                      win2_sensor: binary_sensor.fenster_6
-                      smoke_sensor: binary_sensor.wohnzimmer_rauchmelder_garten_rauchalarm
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.wohnzimmer_antrieb_garten
-                        name: Heizung Garten
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: thermostat
-                        entity: climate.wohnzimmer_antrieb_hof
-                        name: Heizung Hof
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: custom:button-card
-                        template: room_shutter_card
-                        entity: cover.hmip_broll_2_0036a269a0b6ee
-                        variables:
-                          shutter_name: Rollladen Garten
-                      - type: custom:button-card
-                        template: room_shutter_card
-                        entity: cover.wohnzimmer_rolladen_hof
-                        variables:
-                          shutter_name: Rollladen Hof
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: media_player.fernseher_im_wohnzimmer_2
-                        variables:
-                          dev_name: Fernseher Wohnzimmer
-                          dev_icon: mdi:television
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: vacuum.tanjas_helfer
-                        variables:
-                          dev_name: Saugroboter (Tanjas Helfer)
-                          dev_icon: mdi:robot-vacuum
-                          sub_sensor: sensor.tanjas_helfer_batterie
-                          sub_unit: '%'
-              - type: custom:button-card
-                template: version_footer
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: wohnen
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Wohnbereich
+                    room_subtitle: Erdgeschoss • Heizung, Rollläden & Medien
+                    room_icon: mdi:sofa-outline
+                    temp_sensor: sensor.wohnzimmer_thermostat_temperatur
+                    hum_sensor: sensor.wohnzimmer_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.terrassentur_2
+                    win2_sensor: binary_sensor.fenster_6
+                    smoke_sensor: binary_sensor.wohnzimmer_rauchmelder_garten_rauchalarm
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
+                        cards:
+                          - type: thermostat
+                            entity: climate.wohnzimmer_antrieb_garten
+                            name: Heizung Garten
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: thermostat
+                            entity: climate.wohnzimmer_antrieb_hof
+                            name: Heizung Hof
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: custom:button-card
+                            template: room_shutter_card
+                            entity: cover.hmip_broll_2_0036a269a0b6ee
+                            variables:
+                              shutter_name: Rollladen Garten
+                          - type: custom:button-card
+                            template: room_shutter_card
+                            entity: cover.wohnzimmer_rolladen_hof
+                            variables:
+                              shutter_name: Rollladen Hof
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: media_player.fernseher_im_wohnzimmer_2
+                            variables:
+                              dev_name: Fernseher Wohnzimmer
+                              dev_icon: mdi:television
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: vacuum.tanjas_helfer
+                            variables:
+                              dev_name: Saugroboter (Tanjas Helfer)
+                              dev_icon: mdi:robot-vacuum
+                              sub_sensor: sensor.tanjas_helfer_batterie
+                              sub_unit: '%'
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Küche
     path: kueche
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: kueche
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Küche
-                      room_subtitle: Erdgeschoss • Heizung, Rollladen & Küchengeräte
-                      room_icon: mdi:fridge-outline
-                      temp_sensor: sensor.kuche_thermostat_temperatur
-                      hum_sensor: sensor.kuche_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.terrassentur
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.kuche_antrieb
-                        name: Heizung Küche
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: kueche
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Küche
+                    room_subtitle: Erdgeschoss • Heizung, Rollladen & Küchengeräte
+                    room_icon: mdi:fridge-outline
+                    temp_sensor: sensor.kuche_thermostat_temperatur
+                    hum_sensor: sensor.kuche_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.terrassentur
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.kuche_rolladen
-                            variables:
-                              shutter_name: Rollladen Küche
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: input_select.dishwasher_emhass_status
-                            variables:
-                              dev_name: Geschirrspüler (EMHASS)
-                              dev_icon: mdi:dishwasher
-                              power_sensor: sensor.geschirrspuler_leistung
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.kuhlschrank
-                            variables:
-                              dev_name: Kühlschrank
-                              dev_icon: mdi:fridge-outline
-                              power_sensor: sensor.kuhlschrank_leistung
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.kaffeemaschine
-                            variables:
-                              dev_name: Kaffeemaschine
-                              dev_icon: mdi:coffee-maker-outline
-                              power_sensor: sensor.kaffeemaschine_leistung
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.mikrowelle
-                            variables:
-                              dev_name: Mikrowelle
-                              dev_icon: mdi:microwave
-                              power_sensor: sensor.mikrowelle_leistung
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.kuche_antrieb
+                            name: Heizung Küche
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.kuche_rolladen
+                                variables:
+                                  shutter_name: Rollladen Küche
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: input_select.dishwasher_emhass_status
+                                variables:
+                                  dev_name: Geschirrspüler (EMHASS)
+                                  dev_icon: mdi:dishwasher
+                                  power_sensor: sensor.geschirrspuler_leistung
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.kuhlschrank
+                                variables:
+                                  dev_name: Kühlschrank
+                                  dev_icon: mdi:fridge-outline
+                                  power_sensor: sensor.kuhlschrank_leistung
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.kaffeemaschine
+                                variables:
+                                  dev_name: Kaffeemaschine
+                                  dev_icon: mdi:coffee-maker-outline
+                                  power_sensor: sensor.kaffeemaschine_leistung
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.mikrowelle
+                                variables:
+                                  dev_name: Mikrowelle
+                                  dev_icon: mdi:microwave
+                                  power_sensor: sensor.mikrowelle_leistung
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Eltern
     path: parents
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: parents
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Elternschlafzimmer
-                      room_subtitle: Obergeschoss • Daniel & Tanja
-                      room_icon: mdi:bed-king-outline
-                      person_entity: person.daniel
-                      person2_entity: person.tanja
-                      temp_sensor: sensor.eltern_antrieb_temperatur
-                      win_sensor: binary_sensor.fenster_5
-                      smoke_sensor: binary_sensor.eltern_rauchmelder_rauchalarm
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.eltern_antrieb
-                        name: Heizung Eltern
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: parents
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Elternschlafzimmer
+                    room_subtitle: Obergeschoss • Daniel & Tanja
+                    room_icon: mdi:bed-king-outline
+                    person_entity: person.daniel
+                    person2_entity: person.tanja
+                    temp_sensor: sensor.eltern_antrieb_temperatur
+                    win_sensor: binary_sensor.fenster_5
+                    smoke_sensor: binary_sensor.eltern_rauchmelder_rauchalarm
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.eltern_rolladen
-                            variables:
-                              shutter_name: Rollladen Eltern
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.eltern_antrieb
+                            name: Heizung Eltern
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.eltern_rolladen
+                                variables:
+                                  shutter_name: Rollladen Eltern
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Stefan
     path: stefan
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: stefan
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Stefans Zimmer
-                      room_subtitle: Obergeschoss • Heizung & Rollladen
-                      room_icon: mdi:account-outline
-                      person_entity: person.stefan
-                      temp_sensor: sensor.stefan_thermostat_temperatur
-                      hum_sensor: sensor.stefan_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.fenster_4
-                      smoke_sensor: binary_sensor.stefan_rauchmelder
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.stefan_antrieb
-                        name: Heizung Stefan
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: stefan
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Stefans Zimmer
+                    room_subtitle: Obergeschoss • Heizung & Rollladen
+                    room_icon: mdi:account-outline
+                    person_entity: person.stefan
+                    temp_sensor: sensor.stefan_thermostat_temperatur
+                    hum_sensor: sensor.stefan_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.fenster_4
+                    smoke_sensor: binary_sensor.stefan_rauchmelder
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.stefan_rolladen
-                            variables:
-                              shutter_name: Rollladen Stefan
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.stefan_antrieb
+                            name: Heizung Stefan
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.stefan_rolladen
+                                variables:
+                                  shutter_name: Rollladen Stefan
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Simon
     path: simon
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: simon
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Simons Zimmer
-                      room_subtitle: Obergeschoss • Heizung, Rollladen & Medien
-                      room_icon: mdi:gamepad-variant-outline
-                      person_entity: person.simon
-                      temp_sensor: sensor.simon_thermostat_temperatur
-                      hum_sensor: sensor.simon_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.fenster_3
-                      smoke_sensor: binary_sensor.simon_rauchmelder
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.simon_antrieb
-                        name: Heizung Simon
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: simon
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Simons Zimmer
+                    room_subtitle: Obergeschoss • Heizung, Rollladen & Medien
+                    room_icon: mdi:gamepad-variant-outline
+                    person_entity: person.simon
+                    temp_sensor: sensor.simon_thermostat_temperatur
+                    hum_sensor: sensor.simon_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.fenster_3
+                    smoke_sensor: binary_sensor.simon_rauchmelder
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.simon_rolladen
-                            variables:
-                              shutter_name: Rollladen Simon
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.simon_tv
-                            variables:
-                              dev_name: Fernseher / Konsole Simon
-                              dev_icon: mdi:television-play
-                              power_sensor: sensor.simon_tv_leistung
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.simon_antrieb
+                            name: Heizung Simon
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.simon_rolladen
+                                variables:
+                                  shutter_name: Rollladen Simon
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.simon_tv
+                                variables:
+                                  dev_name: Fernseher / Konsole Simon
+                                  dev_icon: mdi:television-play
+                                  power_sensor: sensor.simon_tv_leistung
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Lukas
     path: lukas
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: lukas
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Lukas Zimmer
-                      room_subtitle: Obergeschoss • Heizung, Rollladen & Workstation
-                      room_icon: mdi:laptop
-                      person_entity: person.lukas
-                      temp_sensor: sensor.lukas_thermostat_temperatur
-                      hum_sensor: sensor.lukas_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.fenster_2
-                      smoke_sensor: binary_sensor.lukas_rauchmelder
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.lukas_antrieb
-                        name: Heizung Lukas
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: lukas
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Lukas Zimmer
+                    room_subtitle: Obergeschoss • Heizung, Rollladen & Workstation
+                    room_icon: mdi:laptop
+                    person_entity: person.lukas
+                    temp_sensor: sensor.lukas_thermostat_temperatur
+                    hum_sensor: sensor.lukas_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.fenster_2
+                    smoke_sensor: binary_sensor.lukas_rauchmelder
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.lukas_rolladen
-                            variables:
-                              shutter_name: Rollladen Lukas
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.lukas_workstation
-                            variables:
-                              dev_name: Workstation Lukas
-                              dev_icon: mdi:desktop-tower-monitor
-                              power_sensor: sensor.lukas_workstation_leistung
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.lukas_tv
-                            variables:
-                              dev_name: Fernseher Lukas
-                              dev_icon: mdi:television
-                              power_sensor: sensor.lukas_tv_leistung
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: media_player.googlehome_2
-                            variables:
-                              dev_name: Google Home Lautsprecher
-                              dev_icon: mdi:speaker-wireless
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.lukas_antrieb
+                            name: Heizung Lukas
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.lukas_rolladen
+                                variables:
+                                  shutter_name: Rollladen Lukas
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.lukas_workstation
+                                variables:
+                                  dev_name: Workstation Lukas
+                                  dev_icon: mdi:desktop-tower-monitor
+                                  power_sensor: sensor.lukas_workstation_leistung
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.lukas_tv
+                                variables:
+                                  dev_name: Fernseher Lukas
+                                  dev_icon: mdi:television
+                                  power_sensor: sensor.lukas_tv_leistung
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: media_player.googlehome_2
+                                variables:
+                                  dev_name: Google Home Lautsprecher
+                                  dev_icon: mdi:speaker-wireless
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Büro
     path: buero
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: buero
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Büro
-                      room_subtitle: Erdgeschoss • Arbeitsplatz, Heizung & Drucker
-                      room_icon: mdi:desk
-                      temp_sensor: sensor.buro_thermostat_temperatur
-                      hum_sensor: sensor.buro_thermostat_luftfeuchtigkeit
-                      win_sensor: binary_sensor.fenster
-                      smoke_sensor: binary_sensor.buro_rauchmelder
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: thermostat
-                        entity: climate.buro_antrieb
-                        name: Heizung Büro
-                        card_mod:
-                          style: |
-                            ha-card {
-                              border-radius: 18px !important;
-                              border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
-                            }
-                      - type: vertical-stack
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: buero
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Büro
+                    room_subtitle: Erdgeschoss • Arbeitsplatz, Heizung & Drucker
+                    room_icon: mdi:desk
+                    temp_sensor: sensor.buro_thermostat_temperatur
+                    hum_sensor: sensor.buro_thermostat_luftfeuchtigkeit
+                    win_sensor: binary_sensor.fenster
+                    smoke_sensor: binary_sensor.buro_rauchmelder
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
                         cards:
-                          - type: custom:button-card
-                            template: room_shutter_card
-                            entity: cover.buro_rolladen
-                            variables:
-                              shutter_name: Rollladen Büro
-                          - type: custom:button-card
-                            template: room_device_card
-                            entity: switch.printer
-                            variables:
-                              dev_name: Epson ET-2850 Drucker
-                              dev_icon: mdi:printer-outline
-                              power_sensor: sensor.printer_leistung
-                              sub_sensor: sensor.epson_et_2850_series
-              - type: custom:button-card
-                template: version_footer
+                          - type: thermostat
+                            entity: climate.buro_antrieb
+                            name: Heizung Büro
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 18px !important;
+                                  border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                                }
+                          - type: vertical-stack
+                            cards:
+                              - type: custom:button-card
+                                template: room_shutter_card
+                                entity: cover.buro_rolladen
+                                variables:
+                                  shutter_name: Rollladen Büro
+                              - type: custom:button-card
+                                template: room_device_card
+                                entity: switch.printer
+                                variables:
+                                  dev_name: Epson ET-2850 Drucker
+                                  dev_icon: mdi:printer-outline
+                                  power_sensor: sensor.printer_leistung
+                                  sub_sensor: sensor.epson_et_2850_series
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Garage
     path: garage
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: garage
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Garage & Mobilität
-                      room_subtitle: go-eCharger Wallbox • Peugeot e-2008 & Rifter
-                      room_icon: mdi:garage-variant
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: input_select.wallbox_emhass_status
-                        variables:
-                          dev_name: go-eCharger Wallbox (EMHASS)
-                          dev_icon: mdi:ev-station
-                          power_sensor: sensor.goe_297534_nrg_11
-                          sub_sensor: sensor.goe_297534_wh
-                          sub_unit: ' Wh'
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: binary_sensor.vr3ezzkxzpj688123_ladekabel_angeschlossen
-                        variables:
-                          dev_name: Ladekabel Status
-                          dev_icon: mdi:power-plug-outline
-                          sub_sensor: binary_sensor.vr3ezzkxzpj688123_batterie_ladt
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: sensor.vr3ezzkxzpj688123_batterie
-                        variables:
-                          dev_name: Peugeot e-2008 Akku & Reichweite
-                          dev_icon: mdi:car-electric
-                          sub_sensor: sensor.vr3ezzkxzpj688123_reichweite
-                          sub_unit: ' km'
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: sensor.rifter_ladezustand
-                        variables:
-                          dev_name: Peugeot Rifter Akku
-                          dev_icon: mdi:car-estate
-                          sub_sensor: sensor.vr3ezzkxzpj688123_kilometer
-                          sub_unit: ' km (e-2008)'
-              - type: custom:button-card
-                template: version_footer
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: garage
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Garage & Mobilität
+                    room_subtitle: go-eCharger Wallbox • Peugeot e-2008 & Rifter
+                    room_icon: mdi:garage-variant
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
+                        cards:
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: input_select.wallbox_emhass_status
+                            variables:
+                              dev_name: go-eCharger Wallbox (EMHASS)
+                              dev_icon: mdi:ev-station
+                              power_sensor: sensor.goe_297534_nrg_11
+                              sub_sensor: sensor.goe_297534_wh
+                              sub_unit: ' Wh'
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: binary_sensor.vr3ezzkxzpj688123_ladekabel_angeschlossen
+                            variables:
+                              dev_name: Ladekabel Status
+                              dev_icon: mdi:power-plug-outline
+                              sub_sensor: binary_sensor.vr3ezzkxzpj688123_batterie_ladt
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: sensor.vr3ezzkxzpj688123_batterie
+                            variables:
+                              dev_name: Peugeot e-2008 Akku & Reichweite
+                              dev_icon: mdi:car-electric
+                              sub_sensor: sensor.vr3ezzkxzpj688123_reichweite
+                              sub_unit: ' km'
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: sensor.rifter_ladezustand
+                            variables:
+                              dev_name: Peugeot Rifter Akku
+                              dev_icon: mdi:car-estate
+                              sub_sensor: sensor.vr3ezzkxzpj688123_kilometer
+                              sub_unit: ' km (e-2008)'
+                - type: custom:button-card
+                  template: version_footer
 
   - title: Energie
     path: energie
     type: panel
     cards:
-      - type: horizontal-stack
-        card_mod:
-          style: |
-            :host { --stack-card-margin: 0; }
-            div#root {
-              display: grid !important;
-              grid-template-columns: 92px 1fr !important;
-              grid-template-rows: 1fr !important;
-              gap: 0 !important;
-              width: 100% !important;
-              min-height: 100vh !important;
-              background: var(--primary-background-color) !important;
-              box-sizing: border-box !important;
-            }
-            @media (max-width: 768px) {
-              div#root {
-                display: flex !important;
-                flex-direction: column !important;
-                width: 100% !important;
-              }
-            }
-            div#root > *:first-child { width: 92px !important; margin: 0 !important; }
-            div#root > *:last-child {
-              margin: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-              min-height: 100vh !important;
-            }
-            @media (max-width: 768px) {
-              div#root > *:first-child { width: 100% !important; height: auto !important; order: 1 !important; }
-              div#root > *:last-child { width: 100% !important; min-height: auto !important; order: 2 !important; }
-            }
-        cards:
-          - type: custom:button-card
-            template: sidebar_layout
-            variables:
-              active_room: energie
-          - type: vertical-stack
-            cards:
-              - type: vertical-stack
-                cards:
-                  - type: custom:button-card
-                    template: top_header_bar
-                  - type: custom:button-card
-                    template: room_header_card
-                    variables:
-                      room_title: Energie, Waschhaus & Technik
-                      room_subtitle: Kostal PV & Batterie • EMHASS Großverbraucher • Haustechnik
-                      room_icon: mdi:solar-power-variant-outline
-                  - type: custom:button-card
-                    template: energy_flow_section
-                  - type: grid
-                    columns: 2
-                    square: false
-                    card_mod:
-                      style: |
-                        :host {
-                          display: block !important;
-                          margin: 6px 16px !important;
-                        }
-                        div#root {
-                          grid-gap: 12px !important;
-                        }
-                    cards:
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: input_select.pv_battery_emhass_status
-                        variables:
-                          dev_name: Kostal Batterie Steuerung
-                          dev_icon: mdi:home-battery-outline
-                          power_sensor: sensor.scb_battery_power
-                          sub_sensor: number.scb_battery_min_soc
-                          sub_unit: '% Min-SoC'
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: input_select.water_bioler_emhass_status
-                        variables:
-                          dev_name: Warmwasser Wärmepumpe (EMHASS)
-                          dev_icon: mdi:water-boiler
-                          power_sensor: sensor.heisswasser_pv_leistung
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: input_select.washing_machine_emhass_status
-                        variables:
-                          dev_name: Waschmaschine (EMHASS)
-                          dev_icon: mdi:washing-machine
-                          power_sensor: sensor.waschmaschine_leistung_2
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: input_select.tumble_dryer_emhass_status
-                        variables:
-                          dev_name: Wäschetrockner (EMHASS)
-                          dev_icon: mdi:tumble-dryer
-                          power_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: switch.gefrierschrank
-                        variables:
-                          dev_name: Gefrierschrank (Vorratsraum)
-                          dev_icon: mdi:treasure-chest-outline
-                          power_sensor: sensor.gefrierschrank_leistung
-                      - type: custom:button-card
-                        template: room_device_card
-                        entity: sensor.softliq_d_bs50023489_restkapazitat
-                        variables:
-                          dev_name: Grünbeck Enthärtungsanlage
-                          dev_icon: mdi:water-check-outline
-                          sub_sensor: sensor.softliq_d_bs50023489_salzvorrat
-                          sub_unit: ' kg Salz'
-              - type: custom:button-card
-                template: version_footer
+      - type: custom:button-card
+        template: kiosk_page_layout
+        custom_fields:
+          sidebar:
+            card:
+              type: custom:button-card
+              template: sidebar_layout
+              variables:
+                active_room: energie
+          main:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: top_header_bar
+                - type: custom:button-card
+                  template: room_header_card
+                  variables:
+                    room_title: Energie, Waschhaus & Technik
+                    room_subtitle: Kostal PV & Batterie • EMHASS Großverbraucher • Haustechnik
+                    room_icon: mdi:solar-power-variant-outline
+                - type: custom:button-card
+                  template: energy_flow_section
+                - type: custom:button-card
+                  template: room_grid_wrapper
+                  custom_fields:
+                    grid:
+                      card:
+                        type: grid
+                        columns: 2
+                        square: false
+                        cards:
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: input_select.pv_battery_emhass_status
+                            variables:
+                              dev_name: Kostal Batterie Steuerung
+                              dev_icon: mdi:home-battery-outline
+                              power_sensor: sensor.scb_battery_power
+                              sub_sensor: number.scb_battery_min_soc
+                              sub_unit: '% Min-SoC'
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: input_select.water_bioler_emhass_status
+                            variables:
+                              dev_name: Warmwasser Wärmepumpe (EMHASS)
+                              dev_icon: mdi:water-boiler
+                              power_sensor: sensor.heisswasser_pv_leistung
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: input_select.washing_machine_emhass_status
+                            variables:
+                              dev_name: Waschmaschine (EMHASS)
+                              dev_icon: mdi:washing-machine
+                              power_sensor: sensor.waschmaschine_leistung_2
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: input_select.tumble_dryer_emhass_status
+                            variables:
+                              dev_name: Wäschetrockner (EMHASS)
+                              dev_icon: mdi:tumble-dryer
+                              power_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: switch.gefrierschrank
+                            variables:
+                              dev_name: Gefrierschrank (Vorratsraum)
+                              dev_icon: mdi:treasure-chest-outline
+                              power_sensor: sensor.gefrierschrank_leistung
+                          - type: custom:button-card
+                            template: room_device_card
+                            entity: sensor.softliq_d_bs50023489_restkapazitat
+                            variables:
+                              dev_name: Grünbeck Enthärtungsanlage
+                              dev_icon: mdi:water-check-outline
+                              sub_sensor: sensor.softliq_d_bs50023489_salzvorrat
+                              sub_unit: ' kg Salz'
+                - type: custom:button-card
+                  template: version_footer
