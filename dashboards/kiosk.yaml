@@ -630,8 +630,11 @@ button_card_templates:
           const priceBorder = isExpensive ? '1.5px solid #f44336' : '1px solid var(--divider-color, rgba(128,128,128,0.2))';
 
           const chipStyle = 'display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border-radius:16px;font-size:12px;font-weight:600;color:var(--primary-text-color);background:var(--secondary-background-color, rgba(128,128,128,0.1));border:1px solid var(--divider-color, rgba(128,128,128,0.2));user-select:none;';
-          const paperUrgent = typeof paperDays === 'number' && paperDays <= 2;
-          const wasteUrgent = typeof wasteDays === 'number' && wasteDays <= 2;
+          const paperUrgent = typeof paperDays === 'number' && paperDays >= 0 && paperDays <= 3;
+          const wasteUrgent = typeof wasteDays === 'number' && wasteDays >= 0 && wasteDays <= 3;
+          const paperAnim = paperUrgent ? 'animation: pulse-alert 1.4s infinite ease-in-out;' : '';
+          const wasteAnim = wasteUrgent ? 'animation: pulse-alert 1.4s infinite ease-in-out;' : '';
+          const shakeIconStyle = 'display:inline-block;animation:icon-shake-3s-1s 4s infinite ease-in-out;transform-origin:center;';
 
           window._kioskLatestHass = hass;
 
@@ -988,30 +991,8 @@ button_card_templates:
               list.appendChild(btn);
             });
 
-            const footer = document.createElement('div');
-            footer.style.cssText = 'padding:12px 16px;border-top:1px solid var(--divider-color, rgba(128,128,128,0.2));display:flex;flex-direction:column;gap:8px;';
-
-            const haSidebarBtn = document.createElement('button');
-            haSidebarBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--divider-color, rgba(128,128,128,0.3));background:var(--secondary-background-color, rgba(128,128,128,0.12));color:var(--primary-text-color);font-size:12px;font-weight:700;cursor:pointer;';
-            haSidebarBtn.innerHTML = '<ha-icon icon="mdi:menu-open" style="--mdc-icon-size:18px;color:var(--primary-color, #03a9f4);"></ha-icon><span>HA Hauptmenü / Übersicht öffnen</span>';
-            haSidebarBtn.addEventListener('click', () => {
-              closeDrawer();
-              try {
-                const haEl = document.querySelector('home-assistant');
-                const mainEl = haEl && haEl.shadowRoot ? haEl.shadowRoot.querySelector('home-assistant-main') : null;
-                if (mainEl) {
-                  mainEl.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true }));
-                }
-                window.location.href = '/lovelace/0?disable_km';
-              } catch (e) {
-                window.location.href = '/lovelace/0?disable_km';
-              }
-            });
-            footer.appendChild(haSidebarBtn);
-
             drawer.appendChild(header);
             drawer.appendChild(list);
-            drawer.appendChild(footer);
             overlay.appendChild(drawer);
             document.body.appendChild(overlay);
           };
@@ -1073,16 +1054,16 @@ button_card_templates:
                   <ha-icon icon="${battIcon}" style="--mdc-icon-size:16px;color:${battIconColor};pointer-events:none;"></ha-icon>
                   <span style="pointer-events:none;">${alertBatteryCount}</span>
                 </div>
-                <div style="${chipStyle}${paperUrgent ? 'border:1.5px solid #3498db;background:rgba(52,152,219,0.14);' : ''}" title="Tage bis Papierabholung">
-                  <ha-icon icon="mdi:recycle" style="--mdc-icon-size:16px;color:#3498db;"></ha-icon>
+                <div style="${chipStyle}${paperUrgent ? 'border:1.5px solid #3498db;background:rgba(52,152,219,0.18);' + paperAnim : ''}" title="Tage bis Papierabholung">
+                  <ha-icon icon="mdi:recycle" style="--mdc-icon-size:16px;color:#3498db;${paperUrgent ? shakeIconStyle : ''}"></ha-icon>
                   <span>${paperDays}d</span>
                 </div>
-                <div style="${chipStyle}${wasteUrgent ? 'border:1.5px solid #e67e22;background:rgba(230,126,34,0.14);' : ''}" title="Tage bis Restmüll / Bio">
-                  <ha-icon icon="mdi:trash-can-outline" style="--mdc-icon-size:16px;color:#e67e22;"></ha-icon>
+                <div style="${chipStyle}${wasteUrgent ? 'border:1.5px solid #e67e22;background:rgba(230,126,34,0.18);' + wasteAnim : ''}" title="Tage bis Restmüll / Bio">
+                  <ha-icon icon="mdi:trash-can-outline" style="--mdc-icon-size:16px;color:#e67e22;${wasteUrgent ? shakeIconStyle : ''}"></ha-icon>
                   <span>${wasteDays}d</span>
                 </div>
                 <div style="${chipStyle}background:${priceBg};border:${priceBorder};${priceAnim}" title="Aktueller Tibber Strompreis">
-                  <ha-icon icon="${isExpensive ? 'mdi:flash-alert' : 'mdi:flash'}" style="--mdc-icon-size:16px;color:${priceColor};"></ha-icon>
+                  <ha-icon icon="${isExpensive ? 'mdi:flash-alert' : 'mdi:flash'}" style="--mdc-icon-size:16px;color:${priceColor};${isExpensive ? shakeIconStyle : ''}"></ha-icon>
                   <span style="color:${priceColor};font-weight:700;">${(price * 100).toFixed(1)} ct</span>
                 </div>
               </div>
@@ -1140,6 +1121,25 @@ button_card_templates:
         0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.5); }
         50% { transform: scale(1.04); box-shadow: 0 0 10px 3px rgba(244, 67, 54, 0.35); }
         100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+      }
+      @keyframes icon-shake-3s-1s {
+        0% { transform: rotate(0deg) scale(1); }
+        5% { transform: rotate(-16deg) scale(1.12); }
+        10% { transform: rotate(16deg) scale(1.12); }
+        15% { transform: rotate(-14deg) scale(1.12); }
+        20% { transform: rotate(14deg) scale(1.12); }
+        25% { transform: rotate(-16deg) scale(1.12); }
+        30% { transform: rotate(16deg) scale(1.12); }
+        35% { transform: rotate(-14deg) scale(1.12); }
+        40% { transform: rotate(14deg) scale(1.12); }
+        45% { transform: rotate(-16deg) scale(1.12); }
+        50% { transform: rotate(16deg) scale(1.12); }
+        55% { transform: rotate(-12deg) scale(1.1); }
+        60% { transform: rotate(12deg) scale(1.1); }
+        65% { transform: rotate(-10deg) scale(1.08); }
+        70% { transform: rotate(10deg) scale(1.05); }
+        75% { transform: rotate(0deg) scale(1); }
+        100% { transform: rotate(0deg) scale(1); }
       }
 
   version_footer:
@@ -1585,18 +1585,31 @@ button_card_templates:
         if (nType === 'pv') return pwr > 0 ? `+${pwr} W` : '0 W';
         if (nType === 'grid') return pwr > 0 ? `-${pwr} W` : '0 W';
         const s = entity ? entity.state : 'done';
-        const statusMap = {
-          'done': 'Fertig',
-          'wait': 'Wartet',
-          'running': 'Läuft',
-          'surplus': 'PV-Eco',
-          'force': 'Force',
-          'force-6': 'Force 6A',
-          'force-10': 'Force 10A',
-          'force-12': 'Force 12A',
-          'force-14': 'Force 14A',
-          'force-16': 'Force 16A'
-        };
+        const statusMap = (nType === 'wallbox')
+          ? {
+              'done': 'Stop / Fertig',
+              'wait': 'EMHASS Warten',
+              'running': 'EMHASS Läuft',
+              'surplus': 'PV-Überschuss',
+              'force': 'Force',
+              'force-6': 'Force 6A',
+              'force-10': 'Force 10A',
+              'force-12': 'Force 12A',
+              'force-14': 'Force 14A',
+              'force-16': 'Force 16A'
+            }
+          : {
+              'done': 'Fertig',
+              'wait': 'Wartet',
+              'running': 'Läuft',
+              'surplus': 'PV-Überschuss',
+              'force': 'Force',
+              'force-6': 'Force 6A',
+              'force-10': 'Force 10A',
+              'force-12': 'Force 12A',
+              'force-14': 'Force 14A',
+              'force-16': 'Force 16A'
+            };
         return statusMap[s] || s;
       ]]]
     extra_styles: |
@@ -1633,6 +1646,9 @@ button_card_templates:
           const pwrSensorId = variables && variables.power_sensor ? variables.power_sensor : null;
           const jsonHelperId = variables && variables.json_helper ? variables.json_helper : null;
           const deferrableId = variables && variables.deferrable_sensor ? variables.deferrable_sensor : null;
+          const chartSensorId = variables && variables.chart_sensor ? variables.chart_sensor : null;
+          const chartType = (variables && variables.chart_type) || (nType === 'pv' ? 'solcast' : (chartSensorId ? 'usage' : null));
+          const hideTibber = Boolean(variables && variables.hide_tibber) || nType === 'pv' || nType === 'grid';
 
           const tibberState = states['sensor.tibber27a_strompreis'];
           const price = tibberState ? (parseFloat(tibberState.state) || 0) : 0;
@@ -1680,6 +1696,27 @@ button_card_templates:
           content.style.cssText = 'padding:20px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;';
 
           const curState = statusEntityId && states[statusEntityId] ? states[statusEntityId].state : '-';
+          const modalStateLabels = (nType === 'wallbox')
+            ? {
+                'done': 'Stop / Fertig',
+                'wait': 'EMHASS Warten',
+                'running': 'EMHASS Läuft',
+                'surplus': 'PV-Überschuss',
+                'force': 'Force',
+                'force-6': 'Force 6A (4.1 kW)',
+                'force-10': 'Force 10A (6.9 kW)',
+                'force-12': 'Force 12A (8.3 kW)',
+                'force-14': 'Force 14A (9.7 kW)',
+                'force-16': 'Force 16A (11 kW)'
+              }
+            : {
+                'done': 'Fertig (Aus)',
+                'wait': 'EMHASS Warten',
+                'running': 'EMHASS Läuft',
+                'surplus': 'PV-Überschuss',
+                'force': 'Sofort Start (Force)'
+              };
+          const curStateDisplay = modalStateLabels[curState] || curState;
           const curPwr = pwrSensorId && states[pwrSensorId] ? Math.round(parseFloat(states[pwrSensorId].state) || 0) : 0;
           const defPwr = deferrableId && states[deferrableId] ? Math.round(parseFloat(states[deferrableId].state) || 0) : null;
 
@@ -1756,7 +1793,7 @@ button_card_templates:
             <div style="display:grid;grid-template-columns:repeat(${defPwr !== null ? 3 : 2}, 1fr);gap:10px;">
               <div style="padding:12px 14px;border-radius:14px;background:var(--secondary-background-color, rgba(128,128,128,0.08));border:1px solid var(--divider-color, rgba(128,128,128,0.16));">
                 <div style="font-size:11px;color:var(--secondary-text-color);">Aktueller Status</div>
-                <div style="font-size:16px;font-weight:700;margin-top:2px;">${curState}</div>
+                <div style="font-size:16px;font-weight:700;margin-top:2px;">${curStateDisplay}</div>
               </div>
               <div style="padding:12px 14px;border-radius:14px;background:var(--secondary-background-color, rgba(128,128,128,0.08));border:1px solid var(--divider-color, rgba(128,128,128,0.16));">
                 <div style="font-size:11px;color:var(--secondary-text-color);">Live Leistung</div>
@@ -1771,7 +1808,7 @@ button_card_templates:
             </div>
           `;
 
-          content.innerHTML = metricsRow + jsonInfoHtml + priceCompareBanner;
+          content.innerHTML = metricsRow + jsonInfoHtml + (hideTibber ? '' : priceCompareBanner);
 
           const warnBox = document.createElement('div');
           warnBox.style.cssText = 'display:none;padding:14px 16px;border-radius:14px;background:rgba(244,67,54,0.18);border:2px solid #f44336;color:var(--primary-text-color);flex-direction:column;gap:10px;';
@@ -1789,8 +1826,8 @@ button_card_templates:
             const optionsList = (nType === 'wallbox')
               ? [
                   { opt: 'done', label: 'Stop / Fertig', icon: 'mdi:stop-circle-outline', isForce: false },
-                  { opt: 'wait', label: 'EMHASS Auto', icon: 'mdi:clock-check-outline', isForce: false },
-                  { opt: 'running', label: 'Eco Plan', icon: 'mdi:calendar-clock', isForce: false },
+                  { opt: 'wait', label: 'EMHASS Warten', icon: 'mdi:clock-check-outline', isForce: false },
+                  { opt: 'running', label: 'EMHASS Läuft', icon: 'mdi:calendar-clock', isForce: false },
                   { opt: 'surplus', label: 'PV-Überschuss', icon: 'mdi:solar-power', isForce: false },
                   { opt: 'force-6', label: 'Force 6A (4.1 kW)', icon: 'mdi:flash', isForce: true },
                   { opt: 'force-10', label: 'Force 10A (6.9 kW)', icon: 'mdi:flash', isForce: true },
@@ -1801,7 +1838,7 @@ button_card_templates:
               : [
                   { opt: 'done', label: 'Fertig (Aus)', icon: 'mdi:check-circle-outline', isForce: false },
                   { opt: 'wait', label: 'EMHASS Warten', icon: 'mdi:clock-outline', isForce: false },
-                  { opt: 'running', label: 'Automatik Läuft', icon: 'mdi:play-circle-outline', isForce: false },
+                  { opt: 'running', label: 'EMHASS Läuft', icon: 'mdi:play-circle-outline', isForce: false },
                   { opt: 'force', label: 'Sofort Start (Force)', icon: 'mdi:flash-alert', isForce: true }
                 ];
 
@@ -1859,6 +1896,103 @@ button_card_templates:
               btnGrid.appendChild(btn);
             });
             content.appendChild(btnGrid);
+          }
+
+          if (chartType === 'solcast' || (chartType === 'usage' && chartSensorId)) {
+            const chartUnit = (variables && variables.chart_unit) || (chartSensorId && chartSensorId.includes('soc') ? '%' : 'W');
+            const isPercentChart = chartUnit === '%';
+            const chartWrap = document.createElement('div');
+            chartWrap.style.cssText = 'margin-top:4px;border-radius:14px;background:var(--secondary-background-color, rgba(128,128,128,0.08));border:1px solid var(--divider-color, rgba(128,128,128,0.16));padding:10px 12px 4px 12px;overflow:hidden;';
+
+            const chartTitle = document.createElement('div');
+            chartTitle.style.cssText = 'font-size:12px;font-weight:700;color:var(--secondary-text-color);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;';
+            chartTitle.innerHTML = chartType === 'solcast'
+              ? '<span>24h Solcast PV-Prognose & Erzeugung (W)</span><span style="font-size:11px;font-weight:500;">Forecast / Ist</span>'
+              : `<span>24h ${isPercentChart ? 'Ladezustand-Verlauf' : 'Leistungsverlauf'} (${chartSensorId})</span><span style="font-size:11px;font-weight:500;">Letzte 24 Stunden</span>`;
+            chartWrap.appendChild(chartTitle);
+
+            if (customElements.get('apexcharts-card')) {
+              const apexEl = document.createElement('apexcharts-card');
+              const baseApexConfig = {
+                chart: { height: '185px', toolbar: { show: false } },
+                grid: { borderColor: 'rgba(128, 128, 128, 0.15)', strokeDashArray: 3 },
+                legend: { show: chartType === 'solcast', position: 'top', horizontalAlign: 'right', fontSize: '11px' },
+                xaxis: { labels: { datetimeUTC: false, format: 'HH:mm', style: { colors: 'var(--secondary-text-color)', fontSize: '10px' } } },
+                tooltip: { enabled: true, shared: true }
+              };
+              const cardCfg = chartType === 'solcast'
+                ? {
+                    type: 'custom:apexcharts-card',
+                    graph_span: '24h',
+                    span: { start: 'hour', offset: '-2h' },
+                    now: { show: true, label: 'Jetzt', color: '#f44336' },
+                    apex_config: baseApexConfig,
+                    yaxis: [{ id: 'power', min: 0, decimals: 0, apex_config: { tickAmount: 4 } }],
+                    series: [
+                      {
+                        entity: 'sensor.solcast_pv_forecast_prognose_heute',
+                        name: 'Solcast Forecast (W)',
+                        yaxis_id: 'power',
+                        type: 'area',
+                        curve: 'smooth',
+                        stroke_width: 2,
+                        color: '#ffc107',
+                        opacity: 0.25,
+                        show: { legend_value: false, in_header: false },
+                        data_generator: "const today = (entity && entity.attributes && entity.attributes.detailedForecast) ? entity.attributes.detailedForecast : []; const tomorrowState = hass.states['sensor.solcast_pv_forecast_prognose_morgen']; const tomorrow = (tomorrowState && tomorrowState.attributes && tomorrowState.attributes.detailedForecast) ? tomorrowState.attributes.detailedForecast : []; return today.concat(tomorrow).map(item => [new Date(item.period_start).getTime(), Math.round(item.pv_estimate * 1000)]);"
+                      },
+                      {
+                        entity: 'sensor.scb_sum_power_of_all_pv_dc_inputs',
+                        name: 'PV Ist (W)',
+                        yaxis_id: 'power',
+                        type: 'line',
+                        curve: 'smooth',
+                        stroke_width: 2,
+                        color: '#4caf50',
+                        extend_to: 'now',
+                        show: { legend_value: false, in_header: false }
+                      }
+                    ]
+                  }
+                : {
+                    type: 'custom:apexcharts-card',
+                    graph_span: '24h',
+                    apex_config: baseApexConfig,
+                    yaxis: [
+                      isPercentChart
+                        ? { id: 'power', min: 0, max: 100, decimals: 0, apex_config: { tickAmount: 4 } }
+                        : { id: 'power', min: 0, decimals: 0, apex_config: { tickAmount: 4 } }
+                    ],
+                    series: [
+                      {
+                        entity: chartSensorId,
+                        name: `${title} (${chartUnit})`,
+                        yaxis_id: 'power',
+                        type: 'area',
+                        curve: 'smooth',
+                        stroke_width: 2,
+                        color: isPercentChart ? '#4caf50' : '#03a9f4',
+                        opacity: 0.2,
+                        extend_to: 'now',
+                        show: { legend_value: false, in_header: false },
+                        group_by: { func: 'avg', duration: '10min' }
+                      }
+                    ]
+                  };
+              try {
+                apexEl.setConfig(cardCfg);
+                apexEl.hass = window._kioskLatestHass || hass;
+                chartWrap.appendChild(apexEl);
+              } catch (e) {}
+            } else if (chartSensorId && customElements.get('hui-sensor-card')) {
+              const sensorCard = document.createElement('hui-sensor-card');
+              try {
+                sensorCard.setConfig({ type: 'sensor', entity: chartSensorId, graph: 'line', hours_to_show: 24, detail: 2 });
+                sensorCard.hass = window._kioskLatestHass || hass;
+                chartWrap.appendChild(sensorCard);
+              } catch (e) {}
+            }
+            content.appendChild(chartWrap);
           }
 
           modal.appendChild(header);
@@ -2528,6 +2662,9 @@ button_card_templates:
             modal_title: Haus-Batterie & Kostal Speicher
             modal_icon: mdi:home-battery
             power_sensor: sensor.scb_battery_power
+            chart_sensor: sensor.scb_battery_soc
+            chart_type: usage
+            chart_unit: '%'
             json_helper: input_text.pv_battery_emhass_json
             deferrable_sensor: sensor.p_deferrable5
           styles:
@@ -2587,6 +2724,8 @@ button_card_templates:
             modal_title: Waschmaschine
             modal_icon: mdi:washing-machine
             power_sensor: sensor.waschmaschine_leistung_2
+            chart_sensor: sensor.waschmaschinestatistik10
+            chart_type: usage
             json_helper: input_text.washing_machine_emhass_json
             deferrable_sensor: sensor.p_deferrable2
       dish:
@@ -2601,6 +2740,8 @@ button_card_templates:
             modal_title: Geschirrspüler
             modal_icon: mdi:dishwasher
             power_sensor: sensor.geschirrspuler_leistung
+            chart_sensor: sensor.geschirrspulerstatistik10
+            chart_type: usage
             json_helper: input_text.dishwasher_emhass_json
             deferrable_sensor: sensor.p_deferrable0
       dryer:
@@ -2615,6 +2756,8 @@ button_card_templates:
             modal_title: Wäschetrockner
             modal_icon: mdi:tumble-dryer
             power_sensor: sensor.tz3000_2putqrmw_ts011f_leistung
+            chart_sensor: sensor.waschetrocknerstatistik10
+            chart_type: usage
             json_helper: input_text.tumble_dryer_emhass_json
             deferrable_sensor: sensor.p_deferrable1
       water:
@@ -2629,6 +2772,8 @@ button_card_templates:
             modal_title: Heißwasser-Boiler
             modal_icon: mdi:water-boiler
             power_sensor: sensor.heisswasser_pv_leistung
+            chart_sensor: sensor.heisswasser_pv_leistung
+            chart_type: usage
             json_helper: input_text.water_bioler_emhass_json
             deferrable_sensor: sensor.p_deferrable3
       pv_node:
@@ -2643,6 +2788,8 @@ button_card_templates:
             modal_title: PV-Anlage (Kostal DC1 + DC2)
             modal_icon: mdi:solar-power
             power_sensor: sensor.scb_sum_power_of_all_pv_dc_inputs
+            chart_type: solcast
+            hide_tibber: true
       power_grid:
         card:
           type: custom:button-card
@@ -2652,9 +2799,12 @@ button_card_templates:
           icon: mdi:transmission-tower
           variables:
             node_type: grid
-            modal_title: Stromnetz & Tibber Tarif
+            modal_title: Stromnetz & Netzbezug
             modal_icon: mdi:transmission-tower
             power_sensor: sensor.scb_home_power_from_grid
+            chart_sensor: sensor.scb_home_power_from_grid
+            chart_type: usage
+            hide_tibber: true
       car:
         card:
           type: custom:button-card
@@ -2667,6 +2817,8 @@ button_card_templates:
             modal_title: go-eCharger Wallbox (Auto)
             modal_icon: mdi:ev-station
             power_sensor: sensor.goe_297534_nrg_11
+            chart_sensor: sensor.goe_297534_nrg_11
+            chart_type: usage
             json_helper: input_text.wallbox_emhass_json
             deferrable_sensor: sensor.p_deferrable4
       autarky_node:
@@ -2681,6 +2833,9 @@ button_card_templates:
             modal_title: Hausverbrauch & Autarkie
             modal_icon: mdi:home-lightning-bolt-outline
             power_sensor: sensor.scb_home_power
+            chart_sensor: sensor.scb_home_power
+            chart_type: usage
+            hide_tibber: true
 
   room_header_card:
     triggers_update: all
@@ -2990,9 +3145,9 @@ button_card_templates:
           let stateText = st;
           if (st === 'on') stateText = 'Eingeschaltet';
           else if (st === 'off') stateText = 'Ausgeschaltet';
-          else if (st === 'done') stateText = 'Bereit / Fertig';
-          else if (st === 'wait') stateText = 'EMHASS Geplant';
-          else if (st === 'running') stateText = 'Aktiv / Läuft';
+          else if (st === 'done') stateText = 'Stop / Fertig';
+          else if (st === 'wait') stateText = 'EMHASS Warten';
+          else if (st === 'running') stateText = 'EMHASS Läuft';
           else if (st === 'surplus') stateText = 'PV-Überschuss';
           else if (st.startsWith('force')) stateText = `Sofortladen (${st.toUpperCase()})`;
           else if (st === 'docked') stateText = 'In Ladestation';
@@ -3819,6 +3974,33 @@ views:
                               dev_icon: mdi:car-estate
                               sub_sensor: sensor.vr3ezzkxzpj688123_kilometer
                               sub_unit: ' km (e-2008)'
+                - type: custom:stellantis-vehicle-card
+                  entity: device_tracker.vr3ezzkxzpj688123_fahrzeug
+                  hide_map: true
+                  card_mod:
+                    style: |
+                      ha-card {
+                        border-radius: 18px !important;
+                        border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                        margin-top: 10px !important;
+                      }
+                - type: map
+                  entities:
+                    - entity: zone.home
+                    - entity: device_tracker.redmi_note_9_pro
+                    - entity: device_tracker.vr3ezzkxzpj688123_fahrzeug
+                    - entity: device_tracker.handy_tanja_xiaomi_13t
+                  theme_mode: auto
+                  hours_to_show: 0
+                  title: Landkarte
+                  card_mod:
+                    style: |
+                      ha-card {
+                        border-radius: 18px !important;
+                        border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.16)) !important;
+                        margin-top: 10px !important;
+                        overflow: hidden !important;
+                      }
                 - type: custom:button-card
                   template: version_footer
 
